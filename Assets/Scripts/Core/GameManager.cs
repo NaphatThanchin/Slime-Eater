@@ -138,6 +138,7 @@ public class GameManager : MonoBehaviour
         State = GameState.GameOver;
         if (scroller) scroller.StopSmoothly(0.5f);
         MissionSystem.Add(MissionSystem.Kind.Distance, Mathf.FloorToInt(GameSession.TotalDistance));
+        LeagueData.RunEnded(GameSession.TotalDistance, GameSession.MaxHp, GameSession.ChaseDist > 0f); // จำระยะไว้ปรับความยากบอท
         bool newBest = SaveData.SubmitRun(GameSession.Score, GameSession.Stage, GameSession.Coins);
         Debug.Log("[GameManager] จบเกม ด่าน " + GameSession.Stage + " คะแนน " + GameSession.Score);
         if (ui) ui.ShowResult(newBest);

@@ -11,12 +11,14 @@ public class MenuManager : MonoBehaviour
     public GameObject namePanel;     // หน้าตั้งชื่อ
     public TMP_InputField nameInput;
     public TMP_Text nameWarning;
+    public GameObject resetPanel;    // ยืนยันลบข้อมูล
 
     void Start()
     {
         Time.timeScale = 1f;
         settingPanel.SetActive(false);
         namePanel.SetActive(false);
+        resetPanel.SetActive(false);
     }
 
     // ปุ่ม PLAY -> เปิดหน้าตั้งชื่อ (ใส่ชื่อเดิมไว้ให้)
@@ -43,6 +45,12 @@ public class MenuManager : MonoBehaviour
     public void CloseSetting() { SaveData.Save(); settingPanel.SetActive(false); } // ปิดแล้วบันทึกเสียงด้วย
     public void SaveGame() { SaveData.Save(); ShowSaveTime(); }                  // ปุ่มบันทึกเกม
     void ShowSaveTime() => saveStatus.text = SaveData.D.savedAt == "" ? "ยังไม่เคยบันทึก" : "บันทึกล่าสุด " + SaveData.D.savedAt;
+    public void ReplayTutorial() { SaveData.D.tutorialDone = false; SaveData.Save(); saveStatus.text = "รอบหน้าจะสอนเล่นอีกครั้ง"; }
+
+    // รีเซ็ตข้อมูล (ถามยืนยันก่อน)
+    public void AskReset() => resetPanel.SetActive(true);
+    public void CancelReset() => resetPanel.SetActive(false);
+    public void ConfirmReset() { SaveData.ResetAll(); SceneManager.LoadScene(SceneManager.GetActiveScene().name); } // โหลดเมนูใหม่ให้ตัวเลขเป็นค่าเริ่มต้น
 
     // ปุ่ม EXIT
     public void ExitGame()

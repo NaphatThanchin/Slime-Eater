@@ -7,8 +7,9 @@ public class NameTag : MonoBehaviour
 {
     public Transform follow;  // ตัวละครที่ชื่อลอยอยู่บนหัว
     public float gap = 0.25f; // ระยะเหนือหัว
+    public bool usePlayerName = true; // false = บอท (RivalBot ใส่ชื่อเอง)
 
-    void Start() => GetComponent<TMP_Text>().text = SaveData.PlayerName;
+    void Start() { if (usePlayerName) GetComponent<TMP_Text>().text = SaveData.PlayerName; }
 
     void LateUpdate()
     {

@@ -1,12 +1,11 @@
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
-// หน้าเมนู: เหรียญ/สถิติ, ร้านค้า (อัปเกรด + ตัวละคร), ภารกิจ 9 หน้า
+// หน้าเมนู: เหรียญ/สถิติ/ลีก และร้านค้า (อัปเกรด + ตัวละคร)
 public class MenuShop : MonoBehaviour
 {
-    public GameObject shopPanel, missionPanel;
-    public TMP_Text bankText, bestScoreText, bestStageText;
+    public GameObject shopPanel;
+    public TMP_Text bankText, bestScoreText, bestStageText, leagueText;
     public TMP_Text[] upgradeLevelTexts, upgradePriceTexts;   // แม่เหล็ก / เกราะ / เลือด
     public TMP_Text[] charStatusTexts;                        // ใต้การ์ดตัวละคร
     public CharacterModel menuModel;                          // สไลม์ตัวใหญ่หน้าเมนู
@@ -15,44 +14,23 @@ public class MenuShop : MonoBehaviour
     public CharacterModel previewModel;                       // โมเดลหมุนโชว์ (กล้องแยก -> RenderTexture)
     public TMP_Text popName, popInfo, popButtonText, popMessage;
     public GameObject popCoin;
-    [Header("ภารกิจ")]
-    public GameObject[] pageButtons;                          // ปุ่มหน้า 1-9 (หน้าที่ทำครบจะหายไป)
-    public GameObject[] missionRows;                          // 3 แถวของหน้าที่เลือก
-    public TMP_Text[] missionTexts;
-    public Image[] missionBars;
-    public TMP_Text pageTitle;
-    int viewing, page;
+    int viewing;
 
     void Start()
     {
         shopPanel.SetActive(false);
-        missionPanel.SetActive(false);
         charPopup.SetActive(false);
-        MissionSystem.OnCompleted += OnMission;
-        MissionSystem.CheckAll();
+        MissionSystem.CheckAll();                             // ภารกิจที่ถึงเป้าแล้วรับรางวัลเลย
         Refresh();
     }
-
-    void OnDestroy() => MissionSystem.OnCompleted -= OnMission;
-    void OnMission(string _) => Refresh();
 
     public void OpenShop() { shopPanel.SetActive(true); Refresh(); }
     public void CloseShop() { CloseCharacter(); shopPanel.SetActive(false); }
-    public void CloseMissions() => missionPanel.SetActive(false);
 
-    public void OpenMissions() // เปิดที่หน้าแรกที่ยังทำไม่ครบ
-    {
-        page = FirstOpenPage();
-        missionPanel.SetActive(true);
-        Refresh();
-    }
-
-    public void ShowPage(int p) { page = p; Refresh(); }
-
-    public void BuyUpgrade(int i) // ซื้ออัปเกรดขั้นถัดไป
+    public void BuyUpgrade(int i) // ซื้ออัปเกรดขั้นถัดไป (เพดานตามลีก)
     {
         var u = (SaveData.Upgrade)i;
-        if (SaveData.Level(u) >= SaveData.MaxUpgrade || !SaveData.TryBuy(SaveData.UpgradePrice(u))) return;
+        if (SaveData.Level(u) >= SaveData.MaxLevel || !SaveData.TryBuy(SaveData.UpgradePrice(u))) return;
         SaveData.LevelUp(u);
         Refresh();
     }
@@ -83,48 +61,24 @@ public class MenuShop : MonoBehaviour
         Refresh();
     }
 
-    void Refresh() // อัปเดตตัวเลขทุกหน้า
+    public void Refresh() // อัปเดตตัวเลขทุกจุด
     {
         bankText.text = SaveData.Bank.ToString("N0");
         bestScoreText.text = SaveData.BestScore.ToString("N0");
         bestStageText.text = SaveData.BestStage.ToString();
+        leagueText.text = LeagueData.Name(SaveData.D.league) + "  #" + LeagueData.PlayerRank;
         for (int i = 0; i < upgradeLevelTexts.Length; i++)
         {
             int lv = SaveData.Level((SaveData.Upgrade)i);
-            upgradeLevelTexts[i].text = "Lv " + lv + " / " + SaveData.MaxUpgrade;
-            upgradePriceTexts[i].text = lv >= SaveData.MaxUpgrade ? "เต็ม" : SaveData.UpgradePrice((SaveData.Upgrade)i).ToString("N0");
+            upgradeLevelTexts[i].text = "Lv " + lv + " / " + SaveData.MaxLevel;
+            upgradePriceTexts[i].text = lv >= SaveData.MaxLevel ? "เต็ม" : SaveData.UpgradePrice((SaveData.Upgrade)i).ToString("N0");
         }
         for (int i = 0; i < charStatusTexts.Length; i++) charStatusTexts[i].text = Status(i, true);
-        if (charPopup.activeSelf)
-        {
-            popName.text = CharacterData.Names[viewing];
-            popInfo.text = CharacterData.Info(viewing);
-            popButtonText.text = Status(viewing, false);
-            popCoin.SetActive(!SaveData.OwnsCharacter(viewing));
-        }
-        RefreshMissions();
-    }
-
-    void RefreshMissions() // ซ่อนหน้าที่ทำครบ + ซ่อนภารกิจที่ทำเสร็จ
-    {
-        bool allDone = true;
-        for (int p = 0; p < pageButtons.Length; p++) { pageButtons[p].SetActive(!MissionSystem.PageDone(p)); allDone &= MissionSystem.PageDone(p); }
-        if (MissionSystem.PageDone(page)) page = FirstOpenPage();                 // หน้าเดิมทำครบ -> ไปหน้าที่ยังเหลือ
-        pageTitle.text = allDone ? "ทำภารกิจครบทุกหน้าแล้ว!" : "หน้า " + (page + 1) + " / " + MissionSystem.Pages;
-        for (int r = 0; r < missionRows.Length; r++)
-        {
-            int i = page * MissionSystem.PerPage + r;
-            missionRows[r].SetActive(!allDone && !MissionSystem.Done(i));
-            missionTexts[r].text = MissionSystem.Title(i) + "\n<size=70%>" + MissionSystem.Progress(i).ToString("N0") + " / " + MissionSystem.Target(i).ToString("N0") + "   รางวัล " + MissionSystem.Reward(i).ToString("N0") + " เหรียญ</size>";
-            missionBars[r].fillAmount = (float)MissionSystem.Progress(i) / MissionSystem.Target(i);
-        }
-    }
-
-    static int FirstOpenPage() // หน้าแรกที่ยังทำไม่ครบ
-    {
-        int p = 0;
-        while (p < MissionSystem.Pages - 1 && MissionSystem.PageDone(p)) p++;
-        return p;
+        if (!charPopup.activeSelf) return;
+        popName.text = CharacterData.Names[viewing];
+        popInfo.text = CharacterData.Info(viewing);
+        popButtonText.text = Status(viewing, false);
+        popCoin.SetActive(!SaveData.OwnsCharacter(viewing));
     }
 
     static string Status(int i, bool card) => SaveData.Character == i ? "ใช้อยู่" : SaveData.OwnsCharacter(i) ? (card ? "มีแล้ว" : "ใช้ตัวนี้") : CharacterData.Prices[i].ToString("N0");

@@ -36,7 +36,7 @@ public class DebugGuard : MonoBehaviour
             Debug.LogWarning("[DebugGuard] ผู้เล่นตกแมพที่ y=" + player.position.y.ToString("0.0") + " -> ย้ายกลับ");
             player.position = safePosition;
         }
-        if (Time.timeScale == 0f && !gm.IsPaused)
+        if (Time.timeScale == 0f && !gm.IsPaused && !TutorialGuide.Active)
         {
             Debug.LogWarning("[DebugGuard] Time.timeScale ค้างที่ 0 -> คืนค่าเป็น 1");
             Time.timeScale = 1f;

@@ -1,7 +1,8 @@
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-// ระบบบันทึกเกม: เก็บทุกอย่างลงไฟล์ save.json (ชื่อ เหรียญ สถิติ ตัวละคร อัปเกรด ภารกิจ เสียง)
+// ระบบบันทึกเกม: เก็บทุกอย่างลงไฟล์ save.json (ชื่อ เหรียญ สถิติ ตัวละคร อัปเกรด ลีก ภารกิจ เสียง)
 public class SaveData : MonoBehaviour
 {
     [System.Serializable]
@@ -11,13 +12,26 @@ public class SaveData : MonoBehaviour
         public int bank, bestScore, bestStage, character;
         public bool[] owned = { true, false, false, false };     // ตัวละครที่ซื้อแล้ว (ตัวแรกฟรี)
         public int[] upgrades = new int[3];                       // เลเวล แม่เหล็ก / เกราะ / เลือด
-        public int[] stats = new int[MissionSystem.KindCount];   // ตัวนับสะสมของภารกิจ
-        public bool[] missionDone = new bool[MissionSystem.Count];
         public float musicVolume = 0.4f;
-        public string savedAt = "";                               // เวลาบันทึกล่าสุด
+        public bool tutorialDone;
+        public string savedAt = "";
+        // ลีก
+        public int league, leaguePoints, botsLeft = LeagueData.Bots, botFails;
+        public float botCatch, leagueLastD;                       // ระยะจับบอทเป้าหมาย / ของบอทตัวก่อน
+        public List<float> recentRuns = new List<float>();        // ระยะ 3 รอบล่าสุด
+        public List<int> recentHp = new List<int>();              // เลือดสูงสุดตอนวิ่งรอบนั้น
+        // ภารกิจ
+        public int missionVersion;                                // 2 = ตารางภารกิจชุดที่มีการกินบอท
+        public int[] stats = new int[MissionSystem.KindCount];   // ตัวนับสะสม
+        public bool[] missionDone = new bool[MissionSystem.Count];
+        public string dailyDate = "", lastFullDate = "";
+        public int[] dailyPick = new int[3], dailyBase = new int[3];
+        public bool[] dailyDone = new bool[3];
+        public bool dailyBonus, endlessOn;
+        public int streak;
+        public int[] endlessLevel = new int[3], endlessBase = new int[3];
     }
 
-    public const int MaxUpgrade = 10;
     public enum Upgrade { Magnet, Shield, Hp }
     static Data data;
     static string FilePath => Path.Combine(Application.persistentDataPath, "save.json");
@@ -31,9 +45,10 @@ public class SaveData : MonoBehaviour
     public static int Character { get => D.character; set { D.character = value; Save(); } }
     public static bool OwnsCharacter(int i) => D.owned[i];
     public static void UnlockCharacter(int i) { D.owned[i] = true; Save(); }
+    public static int MaxLevel => 10 + 5 * D.league;                   // ขึ้นลีก = ปลดอัปเกรดเพิ่ม 5 เลเวล
     public static int Level(Upgrade u) => D.upgrades[(int)u];
-    public static int UpgradePrice(Upgrade u) => 150 + 70 * Level(u);  // 150, 220, ... 780 (รวม 10 ขั้น = 4,650)
-    public static void LevelUp(Upgrade u) { D.upgrades[(int)u] = Mathf.Min(MaxUpgrade, Level(u) + 1); Save(); }
+    public static int UpgradePrice(Upgrade u) => 150 + 70 * Level(u);   // 150, 220, ... (Lv 1-10 รวม 4,650)
+    public static void LevelUp(Upgrade u) { D.upgrades[(int)u] = Mathf.Min(MaxLevel, Level(u) + 1); Save(); }
 
     public static bool TryBuy(int price) // หักเหรียญถ้าพอ แล้วบันทึก
     {
@@ -59,6 +74,13 @@ public class SaveData : MonoBehaviour
         File.WriteAllText(FilePath, JsonUtility.ToJson(D, true));
     }
 
+    public static void ResetAll() // ลบข้อมูลทั้งหมด เริ่มเล่นใหม่
+    {
+        if (File.Exists(FilePath)) File.Delete(FilePath);
+        data = new Data { missionVersion = 2 };
+        Save();
+    }
+
     static void Load() // อ่านไฟล์ ถ้ายังไม่มีให้ย้ายข้อมูลจากระบบเก่า (PlayerPrefs)
     {
         data = File.Exists(FilePath) ? JsonUtility.FromJson<Data>(File.ReadAllText(FilePath)) : FromPlayerPrefs();
@@ -67,7 +89,7 @@ public class SaveData : MonoBehaviour
         System.Array.Resize(ref data.stats, MissionSystem.KindCount);
         System.Array.Resize(ref data.missionDone, MissionSystem.Count);
         data.owned[0] = true;
-        Debug.Log("[Save] โหลด " + FilePath);
+        if (data.missionVersion < 2) MissionSystem.Migrate();       // เปลี่ยนตารางภารกิจ -> นับใหม่ (ไม่ให้รางวัลซ้ำ)
     }
 
     static Data FromPlayerPrefs()
@@ -79,7 +101,7 @@ public class SaveData : MonoBehaviour
             upgrades = new[] { PlayerPrefs.GetInt("Up_Magnet"), PlayerPrefs.GetInt("Up_Shield"), PlayerPrefs.GetInt("Up_Hp") },
         };
         for (int i = 1; i < d.owned.Length; i++) d.owned[i] = PlayerPrefs.GetInt("Char_" + i) == 1;
-        d.stats[(int)MissionSystem.Kind.Stage] = d.bestStage;        // ด่านที่เคยไปถึงนับเข้าภารกิจ
+        d.stats[(int)MissionSystem.Kind.Stage] = d.bestStage;
         return d;
     }
 }

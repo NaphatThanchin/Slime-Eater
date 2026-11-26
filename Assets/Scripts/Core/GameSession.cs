@@ -10,20 +10,23 @@ public class GameSession : MonoBehaviour
     public static float Distance;              // ระยะในด่านนี้
     public static float TotalDistance;         // ระยะรวมทั้งรอบ
     public static bool Initialized, ReviveUsed; // ReviveUsed = SlimeAngel เกิดใหม่ไปแล้ว
+    public static float ChaseDist;             // วิ่งไล่บอทตัวปัจจุบันมากี่เมตร
+    public static int ChaseHits, EatenThisRun; // โดนชนระหว่างไล่ / กินบอทได้ในรอบนี้
     public static readonly List<string> SeenAnimals = new List<string>(); // สัตว์ที่ออกแล้ว (ไม่ซ้ำจนกว่าจะครบ)
     public static float SpeedMultiplier => Stage <= 1 ? 1f : Mathf.Min(2.3f, 1.3f + 0.2f * (Stage - 2)); // ด่าน 2 เร็วขึ้น 30% แล้ว +20% ต่อด่าน
 
     public static void Reset() // เริ่มรอบใหม่
     {
-        MaxHp = CharacterData.MaxHp[CharacterData.Current] + 5 * SaveData.Level(SaveData.Upgrade.Hp); // เลือดตามตัวละคร + อัปเกรด
-        Hp = MaxHp;
-        Coins = Score = AnimalsSolved = HintLeaves = 0;
-        Distance = TotalDistance = 0f;
+        Hp = MaxHp = CalcMaxHp();
+        Coins = Score = AnimalsSolved = HintLeaves = ChaseHits = EatenThisRun = 0;
+        Distance = TotalDistance = ChaseDist = 0f;
         Stage = 1;
         ReviveUsed = false;
         SeenAnimals.Clear();
         Initialized = true;
     }
+
+    public static int CalcMaxHp() => CharacterData.MaxHp[CharacterData.Current] + 5 * SaveData.Level(SaveData.Upgrade.Hp); // เลือดตามตัวละคร + อัปเกรด
 
     public static void NextStage() // ผ่านบอส -> ด่านต่อไป (เลือด/เหรียญ/คะแนนเก็บไว้)
     {
