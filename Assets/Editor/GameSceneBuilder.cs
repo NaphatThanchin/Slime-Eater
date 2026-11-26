@@ -1566,7 +1566,7 @@ public static class GameSceneBuilder
         var bot = botGo.AddComponent<RivalBot>();
         bot.player = player.GetComponent<LanePlayer>();
         bot.laneWidth = runnerConfig.laneWidth;
-        bot.model = AddCharacter(botGo.transform, 180f, 1f, false);
+        bot.model = AddCharacter(botGo.transform, 180f, 1.3f, false);       // ใหญ่กว่าผู้เล่นนิดหน่อย มองเห็นแต่ไกล
         bot.nameTag = AddNameTag(botGo.transform, bot.model.transform, 3f, false);
         bot.nameTag.color = new Color(1f, 0.55f, 0.45f);
 

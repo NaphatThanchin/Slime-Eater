@@ -11,6 +11,7 @@ public class RivalBot : MonoBehaviour
     public float laneWidth = 2.4f;
     int rank = -1;
     float laneX, laneTimer;
+    Vector3 baseScale;
 
     void Update()
     {
@@ -36,8 +37,10 @@ public class RivalBot : MonoBehaviour
         float hop = tired ? 0f : Mathf.Abs(Mathf.Sin(Time.time * 7f)) * 0.5f;           // วิ่งกระโดดข้ามของเอง
         transform.position = new Vector3(Mathf.MoveTowards(transform.position.x, laneX, 8f * Time.deltaTime), hop, gap);
         float b = tired ? Mathf.Sin(Time.time * 6f) * 0.08f : 0f;                         // หมดแรง = หอบ
-        model.transform.localScale = new Vector3(1f + b, 1f - b, 1f + b);
+        model.transform.localScale = Vector3.Scale(baseScale, new Vector3(1f + b, 1f - b, 1f + b));
     }
+
+    void Awake() => baseScale = model.transform.localScale;
 
     void Spawn() // บอทตัวใหม่ตามอันดับเป้าหมาย
     {
