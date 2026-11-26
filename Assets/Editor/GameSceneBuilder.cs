@@ -677,7 +677,7 @@ public static class GameSceneBuilder
     {
         var root = Stretch(canvas, "SettingsPanel");
         var dim = root.gameObject.AddComponent<Image>(); dim.color = new Color(0, 0, 0, 0.55f);
-        float h = inGame ? 740 : 660;                                                // ความสูงพาเนล
+        float h = inGame ? 740 : 780;                                                // ความสูงพาเนล
         var panel = Img(root, "Panel", S(HC + "Panel_Sprites/Settings pannel.png"), C, 960, 560, 720, h);
         var p = panel.transform;
         Img(p, "TitleBar", S(HC + "Buttons/empty_buttons/orange.png"), C, 960, 540 - h * 0.5f, 480, 120);
@@ -699,13 +699,28 @@ public static class GameSceneBuilder
             IconPill(p, "MenuButton", "orange", HC + "Icons/home_icon.png", "เมนูหลัก", y0 + 270, ui.BackToMenu);
             Txt(p, "PausedNote", "เกมหยุดชั่วคราว", C, 960, 540 + h * 0.5f - 45, 500, 50, 30, new Color(1f, 0.93f, 0.7f), TextAlignmentOptions.Center, true);
         }
-        else // หน้าเมนู: ปุ่มบันทึกเกม + เวลาบันทึกล่าสุด + ตกลง
+        else // หน้าเมนู: บันทึกเกม + เวลาบันทึกล่าสุด + สอนเล่นอีกครั้ง / รีเซ็ตข้อมูล + ตกลง
         {
-            IconPill(p, "SaveButton", "blue", HC + "Icons/upgrade.png", "บันทึกเกม", musicY + 165, menu.SaveGame);
-            menu.saveStatus = Txt(p, "SaveStatus", "", C, 960, musicY + 240, 600, 44, 28, new Color(1f, 0.93f, 0.7f), TextAlignmentOptions.Center, true);
-            IconPill(p, "CloseButton", "green", HC + "Icons/correct.png", "ตกลง", musicY + 320, menu.CloseSetting);
+            IconPill(p, "SaveButton", "blue", HC + "Icons/upgrade.png", "บันทึกเกม", musicY + 160, menu.SaveGame);
+            menu.saveStatus = Txt(p, "SaveStatus", "", C, 960, musicY + 232, 600, 44, 28, new Color(1f, 0.93f, 0.7f), TextAlignmentOptions.Center, true);
+            Btn(p, "TutorialButton", S(HC + "Buttons/empty_buttons/yellow.png"), C, 805, musicY + 318, 290, 100, "สอนเล่นอีกครั้ง", menu.ReplayTutorial, 34);
+            Btn(p, "ResetButton", S(HC + "Buttons/empty_buttons/orange.png"), C, 1115, musicY + 318, 290, 100, "รีเซ็ตข้อมูล", menu.AskReset, 34);
+            IconPill(p, "CloseButton", "green", HC + "Icons/correct.png", "ตกลง", musicY + 445, menu.CloseSetting);
+            menu.resetPanel = BuildResetPanel(root.parent, menu);
         }
         root.gameObject.SetActive(false);
+        return root.gameObject;
+    }
+
+    static GameObject BuildResetPanel(Transform canvas, MenuManager menu) // ยืนยันก่อนลบข้อมูลทั้งหมด
+    {
+        var root = Stretch(canvas, "ResetConfirm");
+        root.gameObject.AddComponent<Image>().color = new Color(0, 0, 0, 0.7f);
+        var p = Img(root, "Panel", S(HC + "Panel_Sprites/Settings pannel.png"), C, 960, 540, 720, 420).transform;
+        Txt(p, "Title", "ลบข้อมูลทั้งหมด?", C, 960, 395, 600, 80, 54, new Color(1f, 0.6f, 0.45f), TextAlignmentOptions.Center, true);
+        Txt(p, "Body", "เหรียญ ตัวละคร อัปเกรด ลีก และภารกิจจะหายทั้งหมด\nย้อนกลับไม่ได้", C, 960, 520, 660, 110, 30, Color.white, TextAlignmentOptions.Center, true);
+        Btn(p, "Confirm", S(HC + "Buttons/empty_buttons/orange.png"), C, 805, 640, 260, 100, "ลบเลย", menu.ConfirmReset, 40);
+        Btn(p, "Cancel", S(HC + "Buttons/empty_buttons/green.png"), C, 1115, 640, 260, 100, "ยกเลิก", menu.CancelReset, 40);
         return root.gameObject;
     }
 
@@ -1181,9 +1196,13 @@ public static class GameSceneBuilder
         shop.bankText = Txt(canvas.transform, "BankText", "0", TL, 230, 70, 260, 70, 50, Color.white, TextAlignmentOptions.Left, true);
         BuildStatsPanel(canvas.transform, shop);
         RoundMenuButton(canvas.transform, "ShopButton", HC + "Icons/gift.png", "ร้านค้า", 120, shop.OpenShop);
-        RoundMenuButton(canvas.transform, "MissionButton", HC + "Icons/flag.png", "ภารกิจ", 290, shop.OpenMissions);
+        var missions = menu.gameObject.AddComponent<MissionPanel>();
+        var league = menu.gameObject.AddComponent<LeaguePanel>();
+        RoundMenuButton(canvas.transform, "MissionButton", HC + "Icons/flag.png", "ภารกิจ", 290, missions.Open);
+        RoundMenuButton(canvas.transform, "LeagueButton", HC + "Icons/leaderboard.png", "ลีก", 460, league.Open);
         BuildShopPanel(canvas.transform, shop);
-        BuildMissionPanel(canvas.transform, shop);
+        BuildMissionPanel(canvas.transform, missions, shop);
+        BuildLeaguePanel(canvas.transform, league);
 
         menu.settingPanel = MakeSettingsPanel(canvas.transform, false, null, menu, out var slider);
         BuildNamePanel(canvas.transform, menu);
@@ -1193,14 +1212,17 @@ public static class GameSceneBuilder
 
     static void BuildStatsPanel(Transform canvas, MenuShop shop) // กรอบสถิติมุมซ้ายบน: คะแนนสูงสุด + ด่านสูงสุด
     {
-        var p = Img(canvas, "StatsPanel", S(HC + "Panel_Sprites/Frame 1584.png"), TL, 245, 185, 440, 150);
+        var p = Img(canvas, "StatsPanel", S(HC + "Panel_Sprites/Frame 1584.png"), TL, 245, 218, 440, 215).transform;
         var gold = new Color(1f, 0.85f, 0.3f);
-        Img(p.transform, "CrownIcon", S(HC + "Icons/crown.png"), C, 790, 505, 54, 48);
-        Txt(p.transform, "ScoreLabel", "คะแนนสูงสุด", C, 920, 505, 190, 50, 30, Color.white, TextAlignmentOptions.Left, true);
-        shop.bestScoreText = Txt(p.transform, "BestScore", "0", C, 1080, 505, 170, 56, 40, gold, TextAlignmentOptions.Right, true);
-        Img(p.transform, "FlagIcon", S(HC + "Icons/flag.png"), C, 790, 572, 46, 52);
-        Txt(p.transform, "StageLabel", "ด่านสูงสุด", C, 920, 572, 190, 50, 30, Color.white, TextAlignmentOptions.Left, true);
-        shop.bestStageText = Txt(p.transform, "BestStage", "0", C, 1080, 572, 170, 56, 40, gold, TextAlignmentOptions.Right, true);
+        Img(p, "CrownIcon", S(HC + "Icons/crown.png"), C, 790, 475, 54, 48);
+        Txt(p, "ScoreLabel", "คะแนนสูงสุด", C, 920, 475, 190, 50, 30, Color.white, TextAlignmentOptions.Left, true);
+        shop.bestScoreText = Txt(p, "BestScore", "0", C, 1080, 475, 170, 56, 40, gold, TextAlignmentOptions.Right, true);
+        Img(p, "FlagIcon", S(HC + "Icons/flag.png"), C, 790, 540, 46, 52);
+        Txt(p, "StageLabel", "ด่านสูงสุด", C, 920, 540, 190, 50, 30, Color.white, TextAlignmentOptions.Left, true);
+        shop.bestStageText = Txt(p, "BestStage", "0", C, 1080, 540, 170, 56, 40, gold, TextAlignmentOptions.Right, true);
+        Img(p, "LeagueIcon", S(HC + "Icons/leaderboard.png"), C, 790, 605, 50, 50);
+        Txt(p, "LeagueLabel", "ลีก", C, 920, 605, 190, 50, 30, Color.white, TextAlignmentOptions.Left, true);
+        shop.leagueText = Txt(p, "League", "Bronze #10", C, 1060, 605, 210, 56, 34, gold, TextAlignmentOptions.Right, true);
     }
 
     static void BuildNamePanel(Transform canvas, MenuManager menu) // ตั้งชื่อก่อนเข้าเกม (ชื่อไปลอยบนหัวสไลม์)
@@ -1230,7 +1252,7 @@ public static class GameSceneBuilder
         root.gameObject.SetActive(false);
     }
 
-    static void AddNameTag(Transform parent, Transform follow, float size) // ชื่อผู้เล่นลอยบนหัว (ตัวหนังสือ 3D)
+    static TextMeshPro AddNameTag(Transform parent, Transform follow, float size, bool playerName = true) // ชื่อลอยบนหัว (ตัวหนังสือ 3D)
     {
         var t = new GameObject("NameTag").AddComponent<TextMeshPro>();
         t.transform.SetParent(parent, false);
@@ -1239,7 +1261,9 @@ public static class GameSceneBuilder
         t.rectTransform.sizeDelta = new Vector2(8f, 1.2f);
         t.text = "ชื่อผู้เล่น";
         t.gameObject.AddComponent<ThaiTextFixer>();
-        t.gameObject.AddComponent<NameTag>().follow = follow;
+        var tag = t.gameObject.AddComponent<NameTag>();
+        tag.follow = follow; tag.usePlayerName = playerName;
+        return t;
     }
 
     static void RoundMenuButton(Transform canvas, string name, string icon, string label, float x, UnityAction onClick) // ปุ่มกลมมุมซ้ายล่าง
@@ -1337,38 +1361,66 @@ public static class GameSceneBuilder
         return rt;
     }
 
-    static void BuildMissionPanel(Transform canvas, MenuShop shop) // ภารกิจ 9 หน้า: ปุ่มเลขหน้า + 3 ภารกิจของหน้าที่เลือก
+    static void BuildMissionPanel(Transform canvas, MissionPanel m, MenuShop shop) // ภารกิจ: แท็บ 3 อัน + เลขหน้า 1-9 + 3 แถว
     {
-        var p = Panel(canvas, "MissionPanel", HC + "Panel_Sprites/Daily Reward pannel.png", 1050, 780, "ภารกิจ", out var root).transform;
-        shop.missionPanel = root;
-        Btn(p, "Close", S(HC + "Icons/Close.png"), C, 1440, 195, 80, 80, null, shop.CloseMissions);
+        var p = Panel(canvas, "MissionPanel", HC + "Panel_Sprites/Daily Reward pannel.png", 1050, 860, "ภารกิจ", out var root).transform;
+        m.panel = root; m.shop = shop;
+        Btn(p, "Close", S(HC + "Icons/Close.png"), C, 1440, 155, 80, 80, null, m.Close);
         var brown = new Color(0.35f, 0.22f, 0.12f);
-        var pages = Rect(p, "Pages", C, 960, 285, 900, 70);                // ปุ่มเลขหน้า (หน้าที่ทำครบจะหายไป ที่เหลือเลื่อนมาชิดกัน)
+        string[] tabNames = { "ประจำวัน", "หลัก", "ต่อเนื่อง" };
+        m.tabs = new Image[3];
+        for (int t = 0; t < 3; t++)
+        {
+            var b = Btn(p, "Tab_" + t, S(ArtGen + "Fx_RoundRect.png"), C, 680 + t * 280, 230, 250, 66, tabNames[t], null, 34);
+            UnityEventTools.AddIntPersistentListener(b.onClick, m.ShowTab, t);
+            m.tabs[t] = b.GetComponent<Image>();
+        }
+        var pages = Rect(p, "Pages", C, 960, 315, 900, 70);                // เลขหน้า (หน้าที่ทำครบหายไป ที่เหลือเลื่อนมาชิดกัน)
         var hl = pages.gameObject.AddComponent<HorizontalLayoutGroup>();
         hl.spacing = 16; hl.childAlignment = TextAnchor.MiddleCenter; hl.childControlWidth = hl.childControlHeight = false;
-        shop.pageButtons = new GameObject[MissionSystem.Pages];
+        m.pagesRoot = pages.gameObject;
+        m.pageButtons = new GameObject[MissionSystem.Pages];
         for (int i = 0; i < MissionSystem.Pages; i++)
         {
             var b = Btn(pages, "Page_" + (i + 1), S(ArtGen + "Fx_Circle.png"), C, 960, 540, 66, 66, (i + 1).ToString(), null, 36);
             b.GetComponent<Image>().color = new Color(0.2f, 0.55f, 0.6f);
-            UnityEventTools.AddIntPersistentListener(b.onClick, shop.ShowPage, i);
-            shop.pageButtons[i] = b.gameObject;
+            UnityEventTools.AddIntPersistentListener(b.onClick, m.ShowPage, i);
+            m.pageButtons[i] = b.gameObject;
         }
-        shop.pageTitle = Txt(p, "PageTitle", "หน้า 1 / 9", C, 960, 350, 600, 50, 34, brown, TextAlignmentOptions.Center);
-        var list = Rect(p, "Missions", C, 960, 630, 900, 480);              // ภารกิจที่ทำเสร็จจะหายไป ที่เหลือเลื่อนขึ้น
+        m.pageTitle = Txt(p, "PageTitle", "หน้า 1 / 9", C, 960, 378, 700, 50, 34, brown, TextAlignmentOptions.Center);
+        var list = Rect(p, "Missions", C, 960, 640, 900, 474);              // ภารกิจที่ทำเสร็จหายไป ที่เหลือเลื่อนขึ้น
         var vl = list.gameObject.AddComponent<VerticalLayoutGroup>();
         vl.spacing = 12; vl.childAlignment = TextAnchor.UpperCenter; vl.childControlWidth = vl.childControlHeight = false;
-        shop.missionRows = new GameObject[MissionSystem.PerPage]; shop.missionTexts = new TMP_Text[MissionSystem.PerPage]; shop.missionBars = new Image[MissionSystem.PerPage];
-        for (int r = 0; r < MissionSystem.PerPage; r++)
+        m.rows = new GameObject[3]; m.texts = new TMP_Text[3]; m.bars = new Image[3];
+        for (int r = 0; r < 3; r++)
         {
             var row = Rect(list, "Mission_" + r, C, 960, 540, 900, 150);
             Img(row, "Flag", S(HC + "Icons/flag.png"), C, 540, 525, 50, 56);
-            shop.missionTexts[r] = Txt(row, "Text", "ภารกิจ", C, 980, 515, 780, 100, 34, brown, TextAlignmentOptions.Left);
+            m.texts[r] = Txt(row, "Text", "ภารกิจ", C, 980, 515, 780, 100, 34, brown, TextAlignmentOptions.Left);
             Img(row, "BarBg", S(HC + "Panel_Sprites/Rectangle 358.png"), C, 980, 582, 780, 22);
             var fill = Img(row, "BarFill", S(ArtGen + "Fx_White.png"), C, 980, 582, 774, 16, new Color(1f, 0.62f, 0.15f));
             fill.type = Image.Type.Filled; fill.fillMethod = Image.FillMethod.Horizontal;
-            shop.missionRows[r] = row.gameObject; shop.missionBars[r] = fill;
+            m.rows[r] = row.gameObject; m.bars[r] = fill;
         }
+        m.footer = Txt(p, "Footer", "", C, 960, 905, 900, 50, 28, brown, TextAlignmentOptions.Center);
+        root.SetActive(false);
+    }
+
+    static void BuildLeaguePanel(Transform canvas, LeaguePanel l) // ตารางลีก 10 อันดับ
+    {
+        var p = Panel(canvas, "LeaguePanel", HC + "Panel_Sprites/Main Menu pannel.png", 1050, 900, "ลีกสไลม์", out var root).transform;
+        l.panel = root;
+        Btn(p, "Close", S(HC + "Icons/Close.png"), C, 1440, 135, 80, 80, null, l.Close);
+        l.title = Txt(p, "League", "ลีก Bronze", C, 960, 215, 900, 50, 36, new Color(1f, 0.9f, 0.5f), TextAlignmentOptions.Center, true);
+        l.rowBg = new Image[10]; l.rowText = new TMP_Text[10]; l.rowPoints = new TMP_Text[10];
+        for (int r = 0; r < 10; r++)
+        {
+            float y = 280 + r * 58;
+            l.rowBg[r] = Img(p, "Row_" + r, S(ArtGen + "Fx_RoundRect.png"), C, 960, y, 900, 52);
+            l.rowText[r] = Txt(l.rowBg[r].transform, "Name", "", C, 860, 540, 660, 50, 30, Color.white, TextAlignmentOptions.Left, true);
+            l.rowPoints[r] = Txt(l.rowBg[r].transform, "Points", "", C, 1270, 540, 200, 50, 30, Color.white, TextAlignmentOptions.Right, true);
+        }
+        l.info = Txt(p, "Info", "", C, 960, 900, 940, 90, 26, Color.white, TextAlignmentOptions.Center, true);
         root.SetActive(false);
     }
 
@@ -1501,6 +1553,29 @@ public static class GameSceneBuilder
         gm.ui = ui;
         MakeHud(canvas.transform, ui);
         Txt(canvas.transform, "ControlsHint", "A / D = เปลี่ยนเลน    Space = กระโดด    S = สไลด์", BC, 960, 1040, 1200, 60, 34, Color.white, TextAlignmentOptions.Center, true);
+
+        // ---------------- บอทคู่แข่ง: แถบใต้คะแนน + ตัวบอทในฉาก ----------------
+        var rival = Img(ui.hudRoot.transform, "RivalPanel", S(HC + "Panel_Sprites/Frame 1584.png"), TR, 1340, 200, 420, 110);
+        ui.rivalRoot = rival.gameObject;
+        ui.rivalName = Txt(rival.transform, "Name", "Bot", C, 860, 515, 190, 44, 28, new Color(1f, 0.6f, 0.5f), TextAlignmentOptions.Left, true);
+        ui.rivalGap = Txt(rival.transform, "Gap", "30 m", C, 1050, 515, 200, 44, 30, Color.white, TextAlignmentOptions.Right, true);
+        Img(rival.transform, "HpBg", S(HC + "Panel_Sprites/Rectangle 358.png"), C, 960, 568, 370, 20);
+        ui.rivalHp = Img(rival.transform, "HpFill", S(ArtGen + "Fx_White.png"), C, 960, 568, 364, 14, new Color(0.9f, 0.3f, 0.3f));
+        ui.rivalHp.type = Image.Type.Filled; ui.rivalHp.fillMethod = Image.FillMethod.Horizontal;
+        var botGo = new GameObject("RivalBot");
+        var bot = botGo.AddComponent<RivalBot>();
+        bot.player = player.GetComponent<LanePlayer>();
+        bot.laneWidth = runnerConfig.laneWidth;
+        bot.model = AddCharacter(botGo.transform, 180f, 1f, false);
+        bot.nameTag = AddNameTag(botGo.transform, bot.model.transform, 3f, false);
+        bot.nameTag.color = new Color(1f, 0.55f, 0.45f);
+
+        // ---------------- สอนเล่นรอบแรก ----------------
+        var tut = systems.gameObject.AddComponent<TutorialGuide>();
+        tut.player = bot.player;
+        var box = Img(canvas.transform, "TutorialHint", S(ArtGen + "Fx_RoundRect.png"), C, 960, 760, 1300, 130, new Color(0.08f, 0.2f, 0.25f, 0.85f));
+        tut.hintBox = box.gameObject;
+        tut.hint = Txt(box.transform, "Text", "", C, 960, 540, 1260, 120, 46, new Color(1f, 0.92f, 0.5f), TextAlignmentOptions.Center, true);
         MakeOverlays(canvas.transform, ui);
         ui.SetProgress(0.0f);
         ui.SetHp(GameSession.MaxHp, GameSession.MaxHp);

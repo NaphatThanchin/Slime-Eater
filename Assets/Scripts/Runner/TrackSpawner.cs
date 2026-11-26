@@ -18,7 +18,7 @@ public class TrackSpawner : MonoBehaviour
     public float switchExtra = 0.35f;      // ต้องสลับกระโดด <-> สไลด์ ให้เวลาเพิ่ม
     System.Random rng;
     float sinceSpawn, nextGap, nextHeal;
-    int nextLeaf, pending;                 // pending = ชุดถัดไปที่เลือกไว้ล่วงหน้า
+    int nextLeaf, pending, tutorialStep;   // pending = ชุดถัดไปที่เลือกไว้ล่วงหน้า
 
     float Speed => WorldScroller.Instance ? WorldScroller.Instance.BaseSpeed : 11f;
     int MaxPattern => Mathf.Min(9, 6 + GameSession.Stage); // ด่านสูงปลดล็อกชุดยาก
@@ -38,6 +38,7 @@ public class TrackSpawner : MonoBehaviour
         var gm = GameManager.Instance;
         if (gm == null || gm.State != GameState.RunnerPhase || GameSession.Distance > GameSession.TargetDistance - stopBeforeBoss) return;
         sinceSpawn += WorldScroller.FrameDelta;
+        if (TutorialGuide.Active) { if (TutorialGuide.ReadyForNext && sinceSpawn > 8f) { sinceSpawn = 0f; SpawnTutorial(); } return; } // สอนเล่น: วางทีละบท
         if (sinceSpawn < nextGap) return;
         sinceSpawn = 0f;
         Need end = SpawnNext(out float length);
@@ -91,6 +92,17 @@ public class TrackSpawner : MonoBehaviour
         return EndNeed(p);
     }
 
+    void SpawnTutorial() // บทเรียน: 0 กำแพงหิน (กระโดด) 1 ท่อนไม้ (สไลด์) 2 หินใหญ่เลนกลาง+ขวา (หลบซ้าย) 3 หัวใจเลนซ้าย
+    {
+        const float z = 40f;
+        GameObject watch;
+        if (tutorialStep == 0) { Spawn(rockPrefab, X(-1), 0f, z); Spawn(rockPrefab, X(1), 0f, z); watch = Spawn(rockPrefab, X(0), 0f, z); }
+        else if (tutorialStep == 1) watch = Spawn(highLogPrefab, 0f, 0f, z);
+        else if (tutorialStep == 2) { Spawn(boulderPrefab, X(1), 0f, z); watch = Spawn(boulderPrefab, X(0), 0f, z); }
+        else watch = Spawn(heartPrefab, X(-1), 0.9f, z);
+        TutorialGuide.Instance.Watch(watch.transform, tutorialStep++);
+    }
+
     static Need StartNeed(int p) => p == 3 ? Need.Slide : p == 2 || p == 7 ? Need.Lane : p == 5 ? Need.None : Need.Jump;
     static Need EndNeed(int p) => p == 7 || p == 3 ? Need.Slide : p == 2 ? Need.Lane : p == 5 ? Need.None : Need.Jump;
     static bool IsSwitch(Need a, Need b) => (a == Need.Jump && b == Need.Slide) || (a == Need.Slide && b == Need.Jump);
@@ -103,5 +115,5 @@ public class TrackSpawner : MonoBehaviour
         for (int i = 0; i < 5; i++) { float t = (i - 2) / 2f; Spawn(coinPrefab, X(lane), 2.1f - t * t, z + t * 3f); }
     }
 
-    void Spawn(Component prefab, float x, float y, float z) => Instantiate(prefab.gameObject, new Vector3(x, y, z), prefab.transform.rotation, transform);
+    GameObject Spawn(Component prefab, float x, float y, float z) => Instantiate(prefab.gameObject, new Vector3(x, y, z), prefab.transform.rotation, transform);
 }

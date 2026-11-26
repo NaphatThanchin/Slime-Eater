@@ -271,9 +271,9 @@ public class BossQuizManager : MonoBehaviour
     {
         if (busy || finished || current == null || GameSession.HintLeaves <= 0) return;
         GameSession.HintLeaves--;
+        MissionSystem.Add(MissionSystem.Kind.Leaves, 1);
         RevealRandomLetter();
         UpdateCounters();
-        Debug.Log("[Boss] ใช้ใบไม้วิเศษ เหลือ " + GameSession.HintLeaves);
         if (AllFilled()) Validate();
     }
 

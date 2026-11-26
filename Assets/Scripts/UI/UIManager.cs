@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -19,6 +20,9 @@ public class UIManager : MonoBehaviour
     public TMP_Text leafText;            // ใบไม้วิเศษที่มี
     public Image[] powerUpFills;         // วงเวลาไอเทม แม่เหล็ก/เกราะ/x2
     public TMP_Text toast;               // ข้อความเด้ง เช่น ภารกิจสำเร็จ
+    public GameObject rivalRoot;         // แถบบอทคู่แข่ง (มีแค่ฉากวิ่ง)
+    public TMP_Text rivalName, rivalGap;
+    public Image rivalHp;
     public FloatingPopup popupTemplate;
     public GameObject settingsPanel;
     public GameObject resultRoot;
@@ -145,14 +149,36 @@ public class UIManager : MonoBehaviour
         if (icon.activeSelf != t > 0f) icon.SetActive(t > 0f);
     }
 
-    public void ShowToast(string text) { if (toast) StartCoroutine(ToastRoutine(text)); }
+    readonly Queue<string> toasts = new Queue<string>();
 
-    IEnumerator ToastRoutine(string text) // ข้อความเลื่อนลงมาแล้วหายไป
+    public void ShowToast(string text) // ข้อความต่อคิว โชว์ทีละอัน
     {
-        toast.text = text;
-        toast.gameObject.SetActive(true);
-        yield return new WaitForSecondsRealtime(2.5f);
+        if (!toast) return;
+        toasts.Enqueue(text);
+        if (toasts.Count == 1) StartCoroutine(ToastRoutine());
+    }
+
+    IEnumerator ToastRoutine()
+    {
+        while (toasts.Count > 0)
+        {
+            toast.text = toasts.Peek();
+            toast.gameObject.SetActive(true);
+            yield return new WaitForSecondsRealtime(2.2f);
+            toasts.Dequeue();
+        }
         toast.gameObject.SetActive(false);
+    }
+
+    public void ShowRival(bool show) { if (rivalRoot && rivalRoot.activeSelf != show) rivalRoot.SetActive(show); }
+
+    public void SetRival(string name, float gap, float hp, bool tired) // แถบบอทเป้าหมาย: ชื่อ ระยะห่าง เลือด
+    {
+        if (!rivalRoot) return;
+        rivalName.text = name;
+        rivalGap.text = (tired ? "หมดแรง! " : "") + Mathf.CeilToInt(gap) + " m";
+        rivalGap.color = tired ? new Color(1f, 0.85f, 0.3f) : Color.white;
+        rivalHp.fillAmount = hp;
     }
 
     public void ShowBanner(string text)

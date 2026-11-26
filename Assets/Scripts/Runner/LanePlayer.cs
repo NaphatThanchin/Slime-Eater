@@ -27,7 +27,7 @@ public class LanePlayer : MonoBehaviour
         var gm = GameManager.Instance;
         if (gm != null && gm.IsPaused) return;
         bool canControl = gm == null || gm.State == GameState.RunnerPhase;
-        if (canControl) ReadInput();
+        if (canControl && !TutorialGuide.Frozen) ReadInput(); // ช่วงสอนเล่นที่หยุดภาพ ให้ TutorialGuide สั่งท่าเอง
         Move();
         UpdateCollider();
         Animate();
@@ -38,22 +38,31 @@ public class LanePlayer : MonoBehaviour
     {
         var kb = Keyboard.current;
         if (kb == null) return;
-        if (kb.aKey.wasPressedThisFrame || kb.leftArrowKey.wasPressedThisFrame) lane = Mathf.Max(-1, lane - 1);
-        if (kb.dKey.wasPressedThisFrame || kb.rightArrowKey.wasPressedThisFrame) lane = Mathf.Min(1, lane + 1);
-        if ((kb.spaceKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame || kb.upArrowKey.wasPressedThisFrame) && grounded)
-        {
-            velocityY = config.jumpVelocity;
-            grounded = false;
-            slideTimer = 0f;
-            MissionSystem.Add(MissionSystem.Kind.Jumps, 1);
-        }
-        if (kb.sKey.wasPressedThisFrame || kb.downArrowKey.wasPressedThisFrame || kb.leftShiftKey.wasPressedThisFrame)
-        {
-            if (!grounded) velocityY = -config.jumpVelocity * 1.5f; // กลางอากาศ = ดิ่งลง
-            slideTimer = config.slideDuration;
-            MissionSystem.Add(MissionSystem.Kind.Slides, 1);
-        }
+        if (kb.aKey.wasPressedThisFrame || kb.leftArrowKey.wasPressedThisFrame) ChangeLane(-1);
+        if (kb.dKey.wasPressedThisFrame || kb.rightArrowKey.wasPressedThisFrame) ChangeLane(1);
+        if (kb.spaceKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame || kb.upArrowKey.wasPressedThisFrame) Jump();
+        if (kb.sKey.wasPressedThisFrame || kb.downArrowKey.wasPressedThisFrame || kb.leftShiftKey.wasPressedThisFrame) Slide();
     }
+
+    public void ChangeLane(int dir) => lane = Mathf.Clamp(lane + dir, -1, 1);
+
+    public void Jump()
+    {
+        if (!grounded) return;
+        velocityY = config.jumpVelocity;
+        grounded = false;
+        slideTimer = 0f;
+        MissionSystem.Add(MissionSystem.Kind.Jumps, 1);
+    }
+
+    public void Slide()
+    {
+        if (!grounded) velocityY = -config.jumpVelocity * 1.5f; // กลางอากาศ = ดิ่งลง
+        slideTimer = config.slideDuration;
+        MissionSystem.Add(MissionSystem.Kind.Slides, 1);
+    }
+
+    public void Gulp() => landSquash = 1f; // กินบอท = ตัวแบนยืดแบบกลืน
 
     void Move() // เลื่อนไปเลนเป้าหมาย + ฟิสิกส์กระโดด (ไม่ต่ำกว่าพื้น กันตกแมพ)
     {
@@ -108,7 +117,7 @@ public class LanePlayer : MonoBehaviour
         if (PowerUps.Instance && PowerUps.Instance.ConsumeShield()) { invincibleTimer = config.invincibleTime; RunnerCamera.Shake(0.15f); return; } // เกราะรับแทน
         if (CharacterAbility.Instance && CharacterAbility.Instance.TryBlockHit()) { invincibleTimer = config.invincibleTime; RunnerCamera.Shake(0.15f); return; } // ความสามารถตัวละคร
         invincibleTimer = config.invincibleTime;
-        Debug.Log("[Player] ชน " + obstacle.kind + " -" + config.obstacleDamage + " HP");
+        GameSession.ChaseHits++;                                  // ภารกิจไล่ทันบอทแบบไม่โดนชน
         gm.Damage(config.obstacleDamage);
         RunnerCamera.Shake(0.3f);
         landSquash = 1f;
