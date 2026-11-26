@@ -1,5 +1,6 @@
 using UnityEngine;
 
+// ข้อมูลสัตว์ 1 ตัวสำหรับฉากบอส (ไฟล์ข้อมูล ScriptableObject ไม่ได้ติดกับวัตถุในฉาก)
 [CreateAssetMenu(fileName = "Animal", menuName = "Slime Eater/Animal Data")]
 public class AnimalDataSO : ScriptableObject
 {

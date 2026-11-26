@@ -1,119 +1,107 @@
 using UnityEngine;
 
-// สุ่มสร้างชุดสิ่งกีดขวาง/ไอเทมตามเลน ด่านยิ่งสูงยิ่งถี่และมีชุดยากขึ้น
+// สุ่มชุดสิ่งกีดขวาง/ไอเทม: ระยะห่างคิดเป็นวินาที (หลบทันทุกความเร็ว) และสุ่มใหม่ทุกครั้งที่เริ่มด่าน
 public class TrackSpawner : MonoBehaviour
 {
+    enum Need { None, Jump, Slide, Lane }  // สิ่งที่ผู้เล่นต้องทำเพื่อผ่านชุดนั้น
     public RunnerConfig config;
-    public Obstacle rockPrefab;          // หิน: กระโดด
-    public Obstacle highLogPrefab;       // ท่อนไม้สูง: สไลด์
-    public Obstacle boulderPrefab;       // หินใหญ่: หลบเลน
-    public Obstacle treeFromRightPrefab; // ต้นไม้ล้มจากขวา
-    public Obstacle treeFromLeftPrefab;  // ต้นไม้ล้มจากซ้าย
-    public Collectible coinPrefab;
-    public Collectible heartPrefab;
-    public Collectible hintLeafPrefab;   // ใบไม้วิเศษ (ช่วยในฉากบอส)
-    public Collectible[] powerUpPrefabs; // แม่เหล็ก / เกราะ / เหรียญ x2
-    public float stopBeforeBoss = 40f;   // ใกล้บอสแล้วเลิกสร้าง
+    public Obstacle rockPrefab;            // หิน: กระโดด
+    public Obstacle highLogPrefab;         // ท่อนไม้สูง: สไลด์
+    public Obstacle boulderPrefab;         // หินใหญ่: หลบเลน
+    public Obstacle treeFromRightPrefab, treeFromLeftPrefab; // ต้นไม้ล้ม
+    public Collectible coinPrefab, heartPrefab, hintLeafPrefab;
+    public Collectible[] powerUpPrefabs;   // แม่เหล็ก / เกราะ / เหรียญ x2
+    public float stopBeforeBoss = 40f;     // ใกล้บอสแล้วเลิกสร้าง
     [Range(0f, 1f)] public float powerUpChance = 0.15f;
-    public float[] hintLeafAt = { 250f, 550f, 850f }; // ใบไม้วิเศษออกที่ระยะเหล่านี้ทุกด่าน
-    float distanceSinceSpawn;
-    float nextGap;
-    float nextHeal;
-    int nextLeaf;
+    public float[] hintLeafAt = { 250f, 550f, 850f };
+    public float minGapTime = 1.15f;       // ห่างกันอย่างน้อย (วินาที) = ลอยตัวตอนกระโดด 0.64 วิ + เวลาตอบสนอง
+    public float switchExtra = 0.35f;      // ต้องสลับกระโดด <-> สไลด์ ให้เวลาเพิ่ม
+    System.Random rng;
+    float sinceSpawn, nextGap, nextHeal;
+    int nextLeaf, pending;                 // pending = ชุดถัดไปที่เลือกไว้ล่วงหน้า
+
+    float Speed => WorldScroller.Instance ? WorldScroller.Instance.BaseSpeed : 11f;
+    int MaxPattern => Mathf.Min(9, 6 + GameSession.Stage); // ด่านสูงปลดล็อกชุดยาก
 
     void Start()
     {
+        int seed = System.Environment.TickCount;     // เมล็ดสุ่มใหม่ทุกด่าน -> อุปสรรคไม่ซ้ำเดิม
+        rng = new System.Random(seed);
         nextGap = config.firstSpawnAt;
         nextHeal = config.healEvery;
+        pending = rng.Next(MaxPattern);
+        Debug.Log("[TrackSpawner] ด่าน " + GameSession.Stage + " seed " + seed);
     }
 
     void Update()
     {
         var gm = GameManager.Instance;
-        if (gm == null || gm.State != GameState.RunnerPhase) return;
-        if (GameSession.Distance > GameSession.TargetDistance - stopBeforeBoss) return;
-        distanceSinceSpawn += WorldScroller.FrameDelta;
-        if (distanceSinceSpawn < nextGap) return;
-        distanceSinceSpawn = 0f;
-        float tighter = 1f + 0.1f * (GameSession.Stage - 1);                 // ด่านสูง = ระยะห่างสั้นลง
-        nextGap = Random.Range(config.minGap, config.maxGap) / tighter;
-        SpawnPattern();
+        if (gm == null || gm.State != GameState.RunnerPhase || GameSession.Distance > GameSession.TargetDistance - stopBeforeBoss) return;
+        sinceSpawn += WorldScroller.FrameDelta;
+        if (sinceSpawn < nextGap) return;
+        sinceSpawn = 0f;
+        Need end = SpawnNext(out float length);
+        float minT = Mathf.Max(minGapTime, 1.7f - 0.08f * (GameSession.Stage - 1)); // ด่านสูงถี่ขึ้นแต่ไม่ต่ำกว่า minGapTime
+        float t = length + minT + (float)rng.NextDouble() * 0.8f;
+        if (IsSwitch(end, StartNeed(pending))) t += switchExtra;
+        nextGap = t * Speed;                                                          // แปลงวินาทีเป็นเมตรตามความเร็วด่าน
     }
 
-    float X(int lane) => lane * config.laneWidth;
-
-    void SpawnPattern()
+    Need SpawnNext(out float length) // วางชุดถัดไป คืนค่าสิ่งที่ต้องทำท้ายชุด + ความยาวชุด (วินาที)
     {
+        length = 0f;
         float z = config.spawnZ;
-        int a = Random.Range(-1, 2), b = (a + Random.Range(1, 3) + 1) % 3 - 1, free = -a - b; // 3 เลนไม่ซ้ำกัน
-        if (GameSession.Distance >= nextHeal) { Spawn(heartPrefab, X(a), 0.9f, z); nextHeal += config.healEvery; return; } // หัวใจทุก 400m
-        if (nextLeaf < hintLeafAt.Length && GameSession.Distance >= hintLeafAt[nextLeaf]) // ใบไม้วิเศษวางบนหิน ต้องกระโดดเก็บ
+        int a = rng.Next(-1, 2), b = (a + rng.Next(1, 3) + 1) % 3 - 1, free = -a - b; // 3 เลนไม่ซ้ำกัน
+        if (GameSession.Distance >= nextHeal) { Spawn(heartPrefab, X(a), 0.9f, z); nextHeal += config.healEvery; return Need.None; }
+        if (nextLeaf < hintLeafAt.Length && GameSession.Distance >= hintLeafAt[nextLeaf]) // ใบไม้วิเศษบนหิน ต้องกระโดดเก็บ
         {
             Spawn(rockPrefab, X(a), 0f, z);
             Spawn(hintLeafPrefab, X(a), 2.1f, z);
             nextLeaf++;
-            return;
+            return Need.Jump;
         }
-        int maxPattern = Mathf.Min(9, 6 + GameSession.Stage);                // ด่านสูงปลดล็อกชุดยาก
-        switch (Random.Range(0, maxPattern))
+        int p = pending;
+        pending = rng.Next(MaxPattern);
+        switch (p)
         {
-            case 0: // หิน 1 ก้อน + แถวเหรียญเลนอื่น
-                Spawn(rockPrefab, X(a), 0f, z);
-                CoinLine(b, z - 4f, 5);
+            case 0: Spawn(rockPrefab, X(a), 0f, z); CoinLine(b, z - 4f, 5); break;                         // หิน 1 ก้อน + เหรียญเลนอื่น
+            case 1: Spawn(rockPrefab, X(a), 0f, z); Spawn(rockPrefab, X(b), 0f, z); CoinArc(a, z); break;  // หิน 2 เลน + เหรียญโค้ง
+            case 2: Spawn(boulderPrefab, X(a), 0f, z); Spawn(rockPrefab, X(b), 0f, z); CoinLine(free, z - 3f, 4); break; // เหลือเลนว่าง 1 เลน
+            case 3: Spawn(highLogPrefab, 0f, 0f, z); CoinLine(a, z - 2f, 3, 0.45f); break;                 // ท่อนไม้สูง ต้องสไลด์
+            case 4:                                                                                         // ต้นไม้ล้มขวางทาง
+                bool right = rng.Next(2) == 0;
+                Spawn(right ? treeFromRightPrefab : treeFromLeftPrefab, 0f, 0f, z);
+                CoinArc(right ? 1 : -1, z);
                 break;
-            case 1: // หิน 2 เลน + เหรียญโค้งเหนือหิน
-                Spawn(rockPrefab, X(a), 0f, z);
-                Spawn(rockPrefab, X(b), 0f, z);
-                CoinArc(a, z);
+            case 5: for (int i = 0; i < 9; i++) Spawn(coinPrefab, X(i / 3 % 2 == 0 ? a : b), 0.7f, z + i * 2f); break; // เหรียญซิกแซก
+            case 6: for (int l = -1; l <= 1; l++) Spawn(rockPrefab, X(l), 0f, z); CoinArc(free, z); break; // กำแพงหิน ต้องกระโดด
+            case 7:                                                                                         // หลบเลน แล้วสไลด์ (ห่าง 1 วิ)
+                length = 1f;
+                Spawn(boulderPrefab, X(a), 0f, z); Spawn(boulderPrefab, X(b), 0f, z);
+                Spawn(highLogPrefab, 0f, 0f, z + Mathf.Max(12f, Speed * length));
                 break;
-            case 2: // หินใหญ่ + หิน -> เหลือเลนว่าง 1 เลน
-                Spawn(boulderPrefab, X(a), 0f, z);
-                Spawn(rockPrefab, X(b), 0f, z);
-                CoinLine(free, z - 3f, 4);
-                break;
-            case 3: // ท่อนไม้สูงทุกเลน ต้องสไลด์ + เหรียญใต้ท่อน
-                Spawn(highLogPrefab, 0f, 0f, z);
-                CoinLine(a, z - 2f, 3, 0.45f);
-                break;
-            case 4: // ต้นไม้ล้มขวางทาง + เหรียญโค้งเหนือลำต้น
-                bool fromRight = Random.value < 0.5f;
-                Spawn(fromRight ? treeFromRightPrefab : treeFromLeftPrefab, 0f, 0f, z);
-                CoinArc(fromRight ? 1 : -1, z);
-                break;
-            case 5: // แถวเหรียญซิกแซกเปลี่ยนเลน
-                for (int i = 0; i < 9; i++) Spawn(coinPrefab, X(i / 3 % 2 == 0 ? a : b), 0.7f, z + i * 2f);
-                break;
-            case 6: // กำแพงหิน 3 เลน ต้องกระโดดอย่างเดียว
-                for (int l = -1; l <= 1; l++) Spawn(rockPrefab, X(l), 0f, z);
-                CoinArc(free, z);
-                break;
-            case 7: // หินใหญ่ 2 เลน + ท่อนไม้สูงตามมา (หลบแล้วต้องสไลด์ต่อ)
-                Spawn(boulderPrefab, X(a), 0f, z);
-                Spawn(boulderPrefab, X(b), 0f, z);
-                Spawn(highLogPrefab, 0f, 0f, z + 12f);
-                break;
-            default: // ต้นไม้ล้ม 2 ต้นติดกันจากคนละฝั่ง
+            default:                                                                                        // ต้นไม้ล้ม 2 ต้นคนละฝั่ง (ห่าง 1.1 วิ)
+                length = 1.1f;
                 Spawn(treeFromRightPrefab, 0f, 0f, z);
-                Spawn(treeFromLeftPrefab, 0f, 0f, z + 14f);
+                Spawn(treeFromLeftPrefab, 0f, 0f, z + Mathf.Max(14f, Speed * length));
                 break;
         }
-        if (Random.value < powerUpChance && powerUpPrefabs.Length > 0) // ไอเทมพลังพิเศษวางเหนือเลนว่าง
-            Spawn(powerUpPrefabs[Random.Range(0, powerUpPrefabs.Length)], X(free), 1.2f, z - 8f);
+        if (rng.NextDouble() < powerUpChance && powerUpPrefabs.Length > 0) // ไอเทมพลังพิเศษเหนือเลนว่าง
+            Spawn(powerUpPrefabs[rng.Next(powerUpPrefabs.Length)], X(free), 1.2f, z - 8f);
+        return EndNeed(p);
     }
 
-    void CoinLine(int lane, float z, int count, float y = 0.7f)
-    {
-        for (int i = 0; i < count; i++) Spawn(coinPrefab, X(lane), y, z + i * 2f);
-    }
+    static Need StartNeed(int p) => p == 3 ? Need.Slide : p == 2 || p == 7 ? Need.Lane : p == 5 ? Need.None : Need.Jump;
+    static Need EndNeed(int p) => p == 7 || p == 3 ? Need.Slide : p == 2 ? Need.Lane : p == 5 ? Need.None : Need.Jump;
+    static bool IsSwitch(Need a, Need b) => (a == Need.Jump && b == Need.Slide) || (a == Need.Slide && b == Need.Jump);
+    float X(int lane) => lane * config.laneWidth;
+
+    void CoinLine(int lane, float z, int count, float y = 0.7f) { for (int i = 0; i < count; i++) Spawn(coinPrefab, X(lane), y, z + i * 2f); }
 
     void CoinArc(int lane, float z) // เหรียญโค้งตามแนวกระโดด
     {
         for (int i = 0; i < 5; i++) { float t = (i - 2) / 2f; Spawn(coinPrefab, X(lane), 2.1f - t * t, z + t * 3f); }
     }
 
-    void Spawn(Component prefab, float x, float y, float z)
-    {
-        if (prefab == null) { Debug.LogWarning("[TrackSpawner] ยังไม่ได้ใส่ Prefab"); return; }
-        Instantiate(prefab.gameObject, new Vector3(x, y, z), prefab.transform.rotation, transform);
-    }
+    void Spawn(Component prefab, float x, float y, float z) => Instantiate(prefab.gameObject, new Vector3(x, y, z), prefab.transform.rotation, transform);
 }

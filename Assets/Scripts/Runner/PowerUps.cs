@@ -12,7 +12,7 @@ public class PowerUps : MonoBehaviour
 
     public static int CoinMultiplier => Instance && Instance.Active(Kind.Double) ? 2 : 1;
     public bool Active(Kind k) => timers[(int)k] > 0f;
-    float Duration(Kind k) => k == Kind.Double ? 10f : 8f + 3f * SaveData.Upgrade(k == Kind.Magnet ? "Magnet" : "Shield"); // อัปเกรดแล้วนานขึ้น
+    float Duration(Kind k) => k == Kind.Double ? 10f : 8f + SaveData.Level(k == Kind.Magnet ? SaveData.Upgrade.Magnet : SaveData.Upgrade.Shield); // อัปเกรด +1 วิ/เลเวล
 
     void Awake() { Instance = this; }
 

@@ -1,0 +1,85 @@
+using System.IO;
+using UnityEngine;
+
+// ระบบบันทึกเกม: เก็บทุกอย่างลงไฟล์ save.json (ชื่อ เหรียญ สถิติ ตัวละคร อัปเกรด ภารกิจ เสียง)
+public class SaveData : MonoBehaviour
+{
+    [System.Serializable]
+    public class Data
+    {
+        public string playerName = "";
+        public int bank, bestScore, bestStage, character;
+        public bool[] owned = { true, false, false, false };     // ตัวละครที่ซื้อแล้ว (ตัวแรกฟรี)
+        public int[] upgrades = new int[3];                       // เลเวล แม่เหล็ก / เกราะ / เลือด
+        public int[] stats = new int[MissionSystem.KindCount];   // ตัวนับสะสมของภารกิจ
+        public bool[] missionDone = new bool[MissionSystem.Count];
+        public float musicVolume = 0.4f;
+        public string savedAt = "";                               // เวลาบันทึกล่าสุด
+    }
+
+    public const int MaxUpgrade = 10;
+    public enum Upgrade { Magnet, Shield, Hp }
+    static Data data;
+    static string FilePath => Path.Combine(Application.persistentDataPath, "save.json");
+    public static Data D { get { if (data == null) Load(); return data; } }
+
+    // ค่าที่ใช้บ่อย
+    public static int Bank { get => D.bank; set => D.bank = Mathf.Max(0, value); }
+    public static int BestScore => D.bestScore;
+    public static int BestStage => D.bestStage;
+    public static string PlayerName { get => D.playerName; set { D.playerName = value; Save(); } }
+    public static int Character { get => D.character; set { D.character = value; Save(); } }
+    public static bool OwnsCharacter(int i) => D.owned[i];
+    public static void UnlockCharacter(int i) { D.owned[i] = true; Save(); }
+    public static int Level(Upgrade u) => D.upgrades[(int)u];
+    public static int UpgradePrice(Upgrade u) => 150 + 70 * Level(u);  // 150, 220, ... 780 (รวม 10 ขั้น = 4,650)
+    public static void LevelUp(Upgrade u) { D.upgrades[(int)u] = Mathf.Min(MaxUpgrade, Level(u) + 1); Save(); }
+
+    public static bool TryBuy(int price) // หักเหรียญถ้าพอ แล้วบันทึก
+    {
+        if (Bank < price) return false;
+        Bank -= price;
+        Save();
+        return true;
+    }
+
+    public static bool SubmitRun(int score, int stage, int coins) // จบรอบ -> เหรียญเข้ากระเป๋า + เช็กสถิติใหม่
+    {
+        Bank += coins;
+        bool newBest = score > D.bestScore;
+        if (newBest) D.bestScore = score;
+        D.bestStage = Mathf.Max(D.bestStage, stage);
+        Save();
+        return newBest;
+    }
+
+    public static void Save() // เขียนไฟล์
+    {
+        D.savedAt = System.DateTime.Now.ToString("dd/MM/yyyy HH:mm");
+        File.WriteAllText(FilePath, JsonUtility.ToJson(D, true));
+    }
+
+    static void Load() // อ่านไฟล์ ถ้ายังไม่มีให้ย้ายข้อมูลจากระบบเก่า (PlayerPrefs)
+    {
+        data = File.Exists(FilePath) ? JsonUtility.FromJson<Data>(File.ReadAllText(FilePath)) : FromPlayerPrefs();
+        System.Array.Resize(ref data.owned, CharacterData.Count);   // กันไฟล์เก่าที่ขนาดไม่ตรง
+        System.Array.Resize(ref data.upgrades, 3);
+        System.Array.Resize(ref data.stats, MissionSystem.KindCount);
+        System.Array.Resize(ref data.missionDone, MissionSystem.Count);
+        data.owned[0] = true;
+        Debug.Log("[Save] โหลด " + FilePath);
+    }
+
+    static Data FromPlayerPrefs()
+    {
+        var d = new Data
+        {
+            bank = PlayerPrefs.GetInt("Bank"), bestScore = PlayerPrefs.GetInt("BestScore"), bestStage = PlayerPrefs.GetInt("BestStage"),
+            character = PlayerPrefs.GetInt("Char"), musicVolume = PlayerPrefs.GetFloat("MusicVolume", 0.4f),
+            upgrades = new[] { PlayerPrefs.GetInt("Up_Magnet"), PlayerPrefs.GetInt("Up_Shield"), PlayerPrefs.GetInt("Up_Hp") },
+        };
+        for (int i = 1; i < d.owned.Length; i++) d.owned[i] = PlayerPrefs.GetInt("Char_" + i) == 1;
+        d.stats[(int)MissionSystem.Kind.Stage] = d.bestStage;        // ด่านที่เคยไปถึงนับเข้าภารกิจ
+        return d;
+    }
+}
