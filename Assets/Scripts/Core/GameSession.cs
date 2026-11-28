@@ -13,7 +13,8 @@ public class GameSession : MonoBehaviour
     public static float ChaseDist;             // วิ่งไล่บอทตัวปัจจุบันมากี่เมตร
     public static int ChaseHits, EatenThisRun; // โดนชนระหว่างไล่ / กินบอทได้ในรอบนี้
     public static readonly List<string> SeenAnimals = new List<string>(); // สัตว์ที่ออกแล้ว (ไม่ซ้ำจนกว่าจะครบ)
-    public static float SpeedMultiplier => Stage <= 1 ? 1f : Mathf.Min(2.3f, 1.3f + 0.2f * (Stage - 2)); // ด่าน 2 เร็วขึ้น 30% แล้ว +20% ต่อด่าน
+    public static float SpeedMultiplier => Stage <= 1 ? 1f + 0.15f * Mathf.InverseLerp(200f, 300f, Distance) // ด่าน 1: ตั้งแต่ 200 m ค่อยๆ เร็วขึ้นถึง +15% ที่ 300 m
+                                                      : Mathf.Min(2.3f, 1.3f + 0.2f * (Stage - 2));      // ด่าน 2 เร็วขึ้น 30% แล้ว +20% ต่อด่าน
 
     public static void Reset() // เริ่มรอบใหม่
     {

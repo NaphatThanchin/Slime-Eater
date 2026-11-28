@@ -9,6 +9,7 @@ public class WorldScroller : MonoBehaviour
     public float BaseSpeed => GameSession.TargetDistance / secondsToBoss * GameSession.SpeedMultiplier; // 11.1 m/s x ด่าน
     public float CurrentSpeed { get; private set; }
     public static float FrameDelta => Instance ? Instance.CurrentSpeed * Time.deltaTime : 0f; // ระยะเลื่อนต่อเฟรม
+    bool stopping;
 
     void Awake()
     {
@@ -16,8 +17,11 @@ public class WorldScroller : MonoBehaviour
         CurrentSpeed = BaseSpeed;
     }
 
+    void Update() { if (!stopping) CurrentSpeed = BaseSpeed; } // ความเร็วเปลี่ยนตามระยะได้ (ด่าน 1 เร็วขึ้นหลัง 200 m)
+
     public void StopSmoothly(float duration) // ชะลอจนหยุด
     {
+        stopping = true;
         StopAllCoroutines();
         StartCoroutine(Decelerate(duration));
     }

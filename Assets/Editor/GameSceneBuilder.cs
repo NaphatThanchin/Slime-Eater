@@ -1764,8 +1764,9 @@ public static class GameSceneBuilder
         orient.desktopOnly = new[] { leafKey.gameObject };
         orient.slime3D = holder;
         Portrait(canvas,                                                    // แนวตั้ง: บนลงล่าง = HUD > คำใบ้ > ภาพสัตว์ > สไลม์ > ช่องคำตอบ > แป้นพิมพ์
-            Move(timer, 0, -380), Move(boss.quotaText, 0, -505), Move(hud.Find("ScorePanel"), -240, -545, 0.85f), // นาฬิกาใต้หลอดเลือด คะแนนใต้ปุ่มใบ้
-            Move(bubble, 0, -705, 0f, TC), Move(boss.animalImage, 0, -1030, 1f, TC), Move(boss.typingBox, 0, 505), Move(nervous, 420, 1000));
+            Move(timer, 0, -470), Move(boss.quotaText, 0, -590), Move(hud.Find("ScorePanel"), -240, -545, 0.85f), // นาฬิกาใต้หลอดเลือด คะแนนใต้ปุ่มใบ้
+            Move(bubble, 0, -745, 0f, TC), Move(boss.animalImage, 0, 30, 1f, C),                              // ภาพสัตว์ยืนกลางจอบนถนน เหนือสไลม์
+            Move(boss.typingBox, 0, 505), Move(nervous, 420, 1000));
 
         MakeOverlays(canvas.transform, ui);
         ui.SetProgress(1f);
