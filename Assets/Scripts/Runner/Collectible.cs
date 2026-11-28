@@ -35,14 +35,13 @@ public class Collectible : ScrollingObject
     {
         switch (kind)
         {
-            case Kind.Coin: gm.AddCoin(value); break;
+            case Kind.Coin: gm.AddCoin(value); AudioManager.Play(AudioManager.Sfx.Coin); break;
             case Kind.Heal: gm.Heal(value); break;
             case Kind.HintLeaf: GameSession.HintLeaves++; if (gm.ui) gm.ui.SetHintLeaves(GameSession.HintLeaves); break;
             case Kind.Magnet: PowerUps.Instance?.Activate(PowerUps.Kind.Magnet); break;
             case Kind.Shield: PowerUps.Instance?.Activate(PowerUps.Kind.Shield); break;
             case Kind.Double: PowerUps.Instance?.Activate(PowerUps.Kind.Double); break;
         }
-        if (kind != Kind.Coin) Debug.Log("[Collectible] เก็บ " + kind);
         Destroy(gameObject);
     }
 }

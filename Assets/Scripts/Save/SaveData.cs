@@ -12,7 +12,7 @@ public class SaveData : MonoBehaviour
         public int bank, bestScore, bestStage, character;
         public bool[] owned = { true, false, false, false };     // ตัวละครที่ซื้อแล้ว (ตัวแรกฟรี)
         public int[] upgrades = new int[3];                       // เลเวล แม่เหล็ก / เกราะ / เลือด
-        public float musicVolume = 0.4f;
+        public float musicVolume = 0.4f, sfxVolume = 0.8f;      // ความดังเพลง / เสียงประกอบ
         public bool tutorialDone;
         public string savedAt = "";
         // ลีก

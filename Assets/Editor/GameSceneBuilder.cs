@@ -132,7 +132,18 @@ public static class GameSceneBuilder
     {
         foreach (var dir in new[] { ArtUI, ArtScreen, ArtAnimal + "Color/", ArtAnimal + "Shadow/" })
             foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { dir.TrimEnd('/') }))
-                SetSprite(AssetDatabase.GUIDToAssetPath(guid), 2048, Vector4.zero);
+                SetSprite(AssetDatabase.GUIDToAssetPath(guid), dir.StartsWith(ArtAnimal) ? 1024 : 2048, Vector4.zero); // รูปสัตว์โชว์ไม่เกิน ~860px -> 1024 พอ (ไฟล์เว็บเล็กลง 4 เท่า)
+        foreach (var dir in new[] { "Assets/Hyper_Casual_UI/Stylized Nature MegaKit[Standard]/Textures", "Assets/Character_Model" }) // พื้นผิวต้นไม้/ตัวละคร 2048 -> 1024 ภาพแทบไม่ต่าง
+            foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { dir }))
+            {
+                var ti = (TextureImporter)AssetImporter.GetAtPath(AssetDatabase.GUIDToAssetPath(guid));
+                if (ti.maxTextureSize > 1024) { ti.maxTextureSize = 1024; ti.SaveAndReimport(); }
+            }
+        foreach (var guid in AssetDatabase.FindAssets("t:Model", new[] { "Assets/Character_Model" }))           // โมเดลตัวละครละเอียดมาก -> บีบอัด mesh
+        {
+            var mi = (ModelImporter)AssetImporter.GetAtPath(AssetDatabase.GUIDToAssetPath(guid));
+            if (mi.meshCompression != ModelImporterMeshCompression.Medium) { mi.meshCompression = ModelImporterMeshCompression.Medium; mi.SaveAndReimport(); }
+        }
 
         // กล่องพิมพ์ใช้ 9-slice เพื่อยืดได้ไม่เพี้ยน
         SetSprite(ArtUI + "Panel_InputBox.png", 2048, new Vector4(14, 14, 14, 14));
@@ -629,6 +640,7 @@ public static class GameSceneBuilder
         scaler.referenceResolution = RefRes;
         scaler.matchWidthOrHeight = 0.5f;
         go.AddComponent<GraphicRaycaster>();
+        go.AddComponent<OrientationLayout>();                    // แนวตั้ง (มือถือ) ปรับขนาด/ย้าย UI เอง
         return canvas;
     }
 
@@ -661,23 +673,25 @@ public static class GameSceneBuilder
         return s;
     }
 
-    static AudioManager MakeAudio(Slider slider)
+    const string AudioDir = "Assets/Audio/Music/";
+    static AudioClip Clip(string file) => AssetDatabase.LoadAssetAtPath<AudioClip>(AudioDir + file);
+
+    static AudioManager MakeAudio(Slider music, Slider sfx) // เพลง + เสียงประกอบ (ระบุไฟล์ชัดเจน ไม่สุ่มตามชื่อในโฟลเดอร์)
     {
-        var go = new GameObject("AudioManager");
-        go.AddComponent<AudioSource>();
-        var am = go.AddComponent<AudioManager>();
-        am.volumeSlider = slider;
-        var music = AssetDatabase.FindAssets("t:AudioClip", new[] { "Assets/Audio/Music" });
-        if (music.Length > 0) am.musicClip = AssetDatabase.LoadAssetAtPath<AudioClip>(AssetDatabase.GUIDToAssetPath(music[0]));
+        var am = new GameObject("AudioManager").AddComponent<AudioManager>();
+        am.volumeSlider = music; am.sfxSlider = sfx;
+        am.musicClip = Clip("alex-productions-happy-and-fun-background-music(chosic.com).mp3");
+        am.bossMusic = Clip("question song.mp3");
+        am.sfxClips = new[] { Clip("Jump.mp3"), Clip("coin.mp3"), Clip("button_Ui.mp3"), Clip("eat-much.mp3") }; // เรียงตาม AudioManager.Sfx
         return am;
     }
 
     // หน้าตั้งค่า (ใช้ทั้งเมนูและในเกม)
-    static GameObject MakeSettingsPanel(Transform canvas, bool inGame, UIManager ui, MenuManager menu, out Slider slider)
+    static GameObject MakeSettingsPanel(Transform canvas, bool inGame, UIManager ui, MenuManager menu, out Slider slider, out Slider sfxSlider)
     {
         var root = Stretch(canvas, "SettingsPanel");
         var dim = root.gameObject.AddComponent<Image>(); dim.color = new Color(0, 0, 0, 0.55f);
-        float h = inGame ? 740 : 780;                                                // ความสูงพาเนล
+        float h = inGame ? 870 : 900;                                                // ความสูงพาเนล (+แถวเสียงประกอบ)
         var panel = Img(root, "Panel", S(HC + "Panel_Sprites/Settings pannel.png"), C, 960, 560, 720, h);
         var p = panel.transform;
         Img(p, "TitleBar", S(HC + "Buttons/empty_buttons/orange.png"), C, 960, 540 - h * 0.5f, 480, 120);
@@ -690,6 +704,12 @@ public static class GameSceneBuilder
         Img(p, "MusicIcon", S(HC + "Icons/musicOn.png"), C, 715, musicY, 76, 76);
         Txt(p, "MusicLabel", "เสียงเพลง", C, 855, musicY, 180, 60, 34, Color.white, TextAlignmentOptions.Left, true);
         slider = MakeSlider(p, C, 1095, musicY, 250, 50);
+        float sfxY = musicY + 128;                                                    // แถวเสียงประกอบ (กระโดด เหรียญ ปุ่ม กิน)
+        Img(p, "SfxRow", S(HC + "Panel_Sprites/Frame 1584.png"), C, 960, sfxY, 620, 120);
+        Img(p, "SfxIcon", S(HC + "Icons/soundon.png"), C, 715, sfxY, 76, 76);
+        Txt(p, "SfxLabel", "เสียงประกอบ", C, 855, sfxY, 190, 60, 34, Color.white, TextAlignmentOptions.Left, true);
+        sfxSlider = MakeSlider(p, C, 1095, sfxY, 250, 50);
+        musicY = sfxY;                                                                // ปุ่มด้านล่างเลื่อนลงตามแถวที่เพิ่ม
 
         if (inGame)
         {
@@ -813,8 +833,10 @@ public static class GameSceneBuilder
         ui.banner.gameObject.SetActive(false);
 
         MakeResult(canvas, ui);
-        ui.settingsPanel = MakeSettingsPanel(canvas, true, ui, null, out var slider);
-        MakeAudio(slider);
+        ui.settingsPanel = MakeSettingsPanel(canvas, true, ui, null, out var slider, out var sfx);
+        MakeAudio(slider, sfx);
+        Portrait(top, Move(ui.banner, 0, 70, 0.9f)); // แนวตั้ง: ป้ายประกาศย่อนิดหน่อย (หน้าสรุปผลเนื้อหากว้าง ~1150 พอดีจออยู่แล้ว)
+        RotatePrompt(top);
 
         var fade = Stretch(canvas, "Fader");
         var fimg = fade.gameObject.AddComponent<Image>(); fimg.color = Color.black; fimg.raycastTarget = false;
@@ -842,7 +864,7 @@ public static class GameSceneBuilder
             ui.bonusTexts[i]    = Txt(p, "BonusValue", "0%", C, 1080, 590, 200, 70, 52, dark, TextAlignmentOptions.Left);
             ui.coinTexts[i]     = Txt(p, "CoinValue", "0", C, 1360, 690, 200, 70, 52, dark, TextAlignmentOptions.Right);
             ui.wordTexts[i]     = Txt(p, "WordValue", "0 คำ", C, 1360, 780, 240, 70, 52, dark, TextAlignmentOptions.Right);
-            ui.scoreTexts[i]    = Txt(p, "ScoreValue", "คะแนนรวม 0", C, 1310, 470, 330, 50, 32, new Color(0.45f, 0.35f, 0.3f), TextAlignmentOptions.Right);
+            ui.scoreTexts[i]    = Txt(p, "ScoreValue", "คะแนนรวม 0", C, 1190, 470, 560, 50, 30, new Color(0.45f, 0.35f, 0.3f), TextAlignmentOptions.Right); // กว้างพอให้อยู่บรรทัดเดียว
             HotspotBtn(p, "OkButton", C, 740, 925, 340, 100, ui.BackToMenu);
             HotspotBtn(p, "PlayAgainButton", C, 1128, 925, 340, 100, ui.RestartGame);
         }
@@ -1186,9 +1208,14 @@ public static class GameSceneBuilder
 
         var post = Img(canvas.transform, "SignPost", S(ArtGen + "Fx_RoundRect.png"), BC, 1600, 690, 70, 820, new Color(0.47f, 0.32f, 0.18f));
         post.pixelsPerUnitMultiplier = 2f;
-        SignButton(canvas.transform, "StartButton", "PLAY", 1590, 470, 4f, menu.StartGame);
-        SignButton(canvas.transform, "SettingButton", "SETTINGS", 1590, 680, -3f, menu.OpenSetting);
-        SignButton(canvas.transform, "ExitButton", "EXIT", 1575, 885, 3f, menu.ExitGame);
+        var play = SignButton(canvas.transform, "StartButton", "PLAY", 1590, 470, 4f, menu.StartGame);
+        var setting = SignButton(canvas.transform, "SettingButton", "SETTINGS", 1590, 680, -3f, menu.OpenSetting);
+        var exit = SignButton(canvas.transform, "ExitButton", "EXIT", 1575, 885, 3f, menu.ExitGame);
+        menu.exitButton = exit.gameObject;
+        Portrait(canvas, Move(post.rectTransform, 0, 640), Move(play, 0, 860), Move(setting, 0, 680), Move(exit, 0, 500), // แนวตั้ง: ป้ายไม้ย้ายมากลางล่าง
+            Move(title, 0, -480, 0.85f), Move(canvas.transform.Find("RopeL"), -250, -330), Move(canvas.transform.Find("RopeR"), 250, -330)); // ป้ายชื่อเกมลงมาใต้กรอบสถิติ
+        var menuLayout = canvas.GetComponent<OrientationLayout>();
+        menuLayout.fixedCamera = cam; menuLayout.portraitCamPos = new Vector3(0.2f, 2.4f, -10.5f); menuLayout.portraitFov = 62f; // ถอยกล้อง เห็นสไลม์ทั้งตัวกลางจอ
 
         var shop = menu.gameObject.AddComponent<MenuShop>();
         shop.menuModel = menuChar;
@@ -1204,10 +1231,32 @@ public static class GameSceneBuilder
         BuildMissionPanel(canvas.transform, missions, shop);
         BuildLeaguePanel(canvas.transform, league);
 
-        menu.settingPanel = MakeSettingsPanel(canvas.transform, false, null, menu, out var slider);
+        menu.settingPanel = MakeSettingsPanel(canvas.transform, false, null, menu, out var slider, out var sfx);
         BuildNamePanel(canvas.transform, menu);
-        MakeAudio(slider);
+        RotatePrompt(canvas);
+        MakeAudio(slider, sfx);
+        new GameObject("SwipeInput").AddComponent<SwipeInput>();
         Save("MainMenu");
+    }
+
+    // ---------- แนวตั้ง (มือถือ) ----------
+    static OrientationLayout.Move Move(Component t, float x, float y, float scale = 0f, Vector2? anchor = null) // ตำแหน่งตอนแนวตั้ง (anchoredPosition)
+        => new OrientationLayout.Move { target = (RectTransform)t.transform, pos = new Vector2(x, y), scale = scale, reanchor = anchor.HasValue, anchor = anchor ?? Vector2.zero };
+
+    static void Portrait(Canvas c, params OrientationLayout.Move[] m) // เพิ่มรายการย้ายให้ Canvas นี้
+    {
+        var o = c.GetComponent<OrientationLayout>();
+        var list = new List<OrientationLayout.Move>(o.moves); list.AddRange(m);
+        o.moves = list.ToArray();
+    }
+
+    static void RotatePrompt(Canvas c) // มือถือถือแนวนอน -> ขึ้นจอบอกให้หมุนเป็นแนวตั้ง (บังการกดด้านหลัง)
+    {
+        var r = Stretch(c.transform, "RotatePrompt");
+        r.gameObject.AddComponent<Image>().color = new Color(0.05f, 0.12f, 0.15f, 0.96f);
+        var t = Txt(r, "Text", "หมุนโทรศัพท์เป็นแนวตั้ง\nเพื่อเล่นได้ดีที่สุด", C, 960, 540, 1200, 300, 64, new Color(1f, 0.9f, 0.5f), TextAlignmentOptions.Center, true);
+        c.GetComponent<OrientationLayout>().rotatePrompt = r.gameObject;
+        r.gameObject.SetActive(false);
     }
 
     static void BuildStatsPanel(Transform canvas, MenuShop shop) // กรอบสถิติมุมซ้ายบน: คะแนนสูงสุด + ด่านสูงสุด
@@ -1351,6 +1400,14 @@ public static class GameSceneBuilder
         stage.gameObject.SetActive(false);
     }
 
+    static Material HueMaterial() // วัสดุเปลี่ยนเฉดสีของบอท (shader ต้องถูกอ้างอิงจากวัสดุ จึงติดไปตอน build)
+    {
+        string path = MatDir + "M_RivalHue.mat";
+        var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (!m) { m = new Material(Shader.Find("SlimeEater/HueShiftLit")); AssetDatabase.CreateAsset(m, path); }
+        return m;
+    }
+
     static RenderTexture PreviewTexture()
     {
         string path = ArtGen + "RT_CharacterPreview.renderTexture";
@@ -1434,12 +1491,13 @@ public static class GameSceneBuilder
         return t;
     }
 
-    static void SignButton(Transform parent, string name, string label, float x, float y, float tilt, UnityAction onClick) // ป้ายไม้ชี้ทาง = ปุ่ม
+    static Button SignButton(Transform parent, string name, string label, float x, float y, float tilt, UnityAction onClick) // ป้ายไม้ชี้ทาง = ปุ่ม
     {
         var b = Btn(parent, name, S(ArtUI + "Button_Wood.png"), BC, x, y, 500, 160, null, onClick);
         b.transform.localEulerAngles = new Vector3(0, 0, tilt);
         var cb = b.colors; cb.highlightedColor = new Color(1f, 0.95f, 0.8f); cb.pressedColor = new Color(0.8f, 0.7f, 0.6f); b.colors = cb;
         TitleTxt(b.transform, "Label", label, 78, new Color(0.97f, 0.93f, 0.8f));
+        return b;
     }
 
     //  5b) RUNNER SCENE (3D วิ่งในป่า 3 เลน)
@@ -1474,7 +1532,9 @@ public static class GameSceneBuilder
         var runChar = AddCharacter(visual, 180f, 1f);         // หันหลังให้กล้อง วิ่งไปข้างหน้า
         AddNameTag(player.transform, runChar.transform, 3f);
         var lp = player.AddComponent<LanePlayer>();
-        lp.config = runnerConfig; lp.visual = visual; lp.hitBox = box;
+        lp.config = runnerConfig; lp.hitBox = box;
+        lp.motion = player.AddComponent<SlimeMotion>();          // ท่าทางชุดเดียวกับบอท
+        lp.motion.config = runnerConfig; lp.motion.visual = visual;
         var bubble = GameObject.CreatePrimitive(PrimitiveType.Sphere); // ฟองเกราะ
         bubble.name = "ShieldBubble";
         Object.DestroyImmediate(bubble.GetComponent<Collider>());
@@ -1552,13 +1612,19 @@ public static class GameSceneBuilder
         var ui = canvas.gameObject.AddComponent<UIManager>();
         gm.ui = ui;
         MakeHud(canvas.transform, ui);
-        Txt(canvas.transform, "ControlsHint", "A / D = เปลี่ยนเลน    Space = กระโดด    S = สไลด์", BC, 960, 1040, 1200, 60, 34, Color.white, TextAlignmentOptions.Center, true);
+        var keysHint = Txt(canvas.transform, "ControlsHint", "A / D = เปลี่ยนเลน    Space = กระโดด    S = สไลด์", BC, 960, 1040, 1200, 60, 34, Color.white, TextAlignmentOptions.Center, true);
+        var swipeHint = Txt(canvas.transform, "SwipeHint", "ปัดซ้าย/ขวา = เปลี่ยนเลน   ปัดขึ้น = กระโดด   ปัดลง = สไลด์", BC, 960, 1040, 1250, 60, 34, Color.white, TextAlignmentOptions.Center, true);
+        var layout = canvas.GetComponent<OrientationLayout>();
+        layout.desktopOnly = new[] { keysHint.gameObject };      // คอมเห็นปุ่มคีย์บอร์ด มือถือเห็นวิธีปัด
+        layout.touchOnly = new[] { swipeHint.gameObject };
+        new GameObject("SwipeInput").AddComponent<SwipeInput>();
 
         // ---------------- บอทคู่แข่ง: แถบใต้คะแนน + ตัวบอทในฉาก ----------------
         var rival = Img(ui.hudRoot.transform, "RivalPanel", S(HC + "Panel_Sprites/Frame 1584.png"), TR, 1340, 200, 420, 110);
         ui.rivalRoot = rival.gameObject;
-        ui.rivalName = Txt(rival.transform, "Name", "Bot", C, 860, 515, 190, 44, 28, new Color(1f, 0.6f, 0.5f), TextAlignmentOptions.Left, true);
-        ui.rivalGap = Txt(rival.transform, "Gap", "30 m", C, 1050, 515, 200, 44, 30, Color.white, TextAlignmentOptions.Right, true);
+        ui.rivalName = Txt(rival.transform, "Name", "Bot", C, 895, 515, 260, 44, 28, new Color(1f, 0.6f, 0.5f), TextAlignmentOptions.Left, true);
+        ui.rivalName.textWrappingMode = TextWrappingModes.NoWrap;            // ชื่อบอทบรรทัดเดียว
+        ui.rivalGap = Txt(rival.transform, "Gap", "30 m", C, 1075, 515, 150, 44, 30, Color.white, TextAlignmentOptions.Right, true);
         Img(rival.transform, "HpBg", S(HC + "Panel_Sprites/Rectangle 358.png"), C, 960, 568, 370, 20);
         ui.rivalHp = Img(rival.transform, "HpFill", S(ArtGen + "Fx_White.png"), C, 960, 568, 364, 14, new Color(0.9f, 0.3f, 0.3f));
         ui.rivalHp.type = Image.Type.Filled; ui.rivalHp.fillMethod = Image.FillMethod.Horizontal;
@@ -1567,8 +1633,13 @@ public static class GameSceneBuilder
         bot.player = player.GetComponent<LanePlayer>();
         bot.laneWidth = runnerConfig.laneWidth;
         bot.model = AddCharacter(botGo.transform, 180f, 1.3f, false);       // ใหญ่กว่าผู้เล่นนิดหน่อย มองเห็นแต่ไกล
+        bot.motion = botGo.AddComponent<SlimeMotion>();
+        bot.motion.config = runnerConfig; bot.motion.visual = bot.model.transform;
+        bot.track = track.transform;
+        bot.hueMaterial = HueMaterial();
         bot.nameTag = AddNameTag(botGo.transform, bot.model.transform, 3f, false);
         bot.nameTag.color = new Color(1f, 0.55f, 0.45f);
+        Portrait(canvas, Move(ui.hudRoot.transform.Find("ScorePanel"), -240, -300), Move(rival, -240, -415)); // แนวตั้ง: คะแนน/บอทชิดขวาใต้เฟือง ไม่ทับหลอดเลือด
 
         // ---------------- สอนเล่นรอบแรก ----------------
         var tut = systems.gameObject.AddComponent<TutorialGuide>();
@@ -1576,6 +1647,7 @@ public static class GameSceneBuilder
         var box = Img(canvas.transform, "TutorialHint", S(ArtGen + "Fx_RoundRect.png"), C, 960, 760, 1300, 130, new Color(0.08f, 0.2f, 0.25f, 0.85f));
         tut.hintBox = box.gameObject;
         tut.hint = Txt(box.transform, "Text", "", C, 960, 540, 1260, 120, 46, new Color(1f, 0.92f, 0.5f), TextAlignmentOptions.Center, true);
+        Portrait(canvas, Move(box, 0, -150, 0.95f));
         MakeOverlays(canvas.transform, ui);
         ui.SetProgress(0.0f);
         ui.SetHp(GameSession.MaxHp, GameSession.MaxHp);
@@ -1682,8 +1754,18 @@ public static class GameSceneBuilder
         boss.quotaText = Txt(hud, "QuotaText", "ทายถูก 0 / 5", TC, 880, 258, 360, 44, 34, Color.white, TextAlignmentOptions.Center, true);
         var leafBtn = Btn(hud, "HintLeafButton", S(HC + "Buttons/empty_buttons/green.png"), TR, 1720, 450, 230, 80, null, boss.UseHintLeaf);
         Img(leafBtn.transform, "Leaf", S(ArtUI + "Icon_Leaf.png"), C, 880, 540, 52, 56);
-        Txt(leafBtn.transform, "Label", "ใช้ใบ้ (Tab)", C, 995, 540, 150, 60, 26, Color.white, TextAlignmentOptions.Center, true);
+        var leafKey = Txt(leafBtn.transform, "Label", "ใช้ใบ้ (Tab)", C, 995, 540, 150, 60, 26, Color.white, TextAlignmentOptions.Center, true);
+        var leafTouch = Txt(leafBtn.transform, "LabelTouch", "ใช้ใบ้", C, 995, 540, 150, 60, 30, Color.white, TextAlignmentOptions.Center, true);
         boss.leafText = ui.leafText;
+
+        var keyboard = BuildKeyboard(canvas.transform, boss);              // แป้น A-Z บนจอ (มือถือไม่มีคีย์บอร์ดจริง)
+        var orient = canvas.GetComponent<OrientationLayout>();
+        orient.touchOnly = new[] { keyboard, leafTouch.gameObject };
+        orient.desktopOnly = new[] { leafKey.gameObject };
+        orient.slime3D = holder;
+        Portrait(canvas,                                                    // แนวตั้ง: บนลงล่าง = HUD > คำใบ้ > ภาพสัตว์ > สไลม์ > ช่องคำตอบ > แป้นพิมพ์
+            Move(timer, 0, -380), Move(boss.quotaText, 0, -505), Move(hud.Find("ScorePanel"), -240, -545, 0.85f), // นาฬิกาใต้หลอดเลือด คะแนนใต้ปุ่มใบ้
+            Move(bubble, 0, -705, 0f, TC), Move(boss.animalImage, 0, -1030, 1f, TC), Move(boss.typingBox, 0, 505), Move(nervous, 420, 1000));
 
         MakeOverlays(canvas.transform, ui);
         ui.SetProgress(1f);
@@ -1696,6 +1778,28 @@ public static class GameSceneBuilder
         guard.player = slimeRoot;
 
         Save("BossScene");
+    }
+
+    static GameObject BuildKeyboard(Transform canvas, BossQuizManager boss) // แป้นพิมพ์ QWERTY 3 แถว + ปุ่มลบ (ปุ่มละ 118x115 กดด้วยนิ้วได้)
+    {
+        var root = Rect(canvas, "Keyboard", BC, 960, 865, 1300, 400);
+        string[] rows = { "QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM" };
+        for (int r = 0; r < 3; r++)
+        {
+            int n = rows[r].Length + (r == 2 ? 2 : 0);                         // แถวล่างมีปุ่มลบกว้าง 2 ช่อง
+            float x0 = 960 - (n * 128 - 10) * 0.5f + 59;
+            for (int i = 0; i < rows[r].Length; i++)
+            {
+                char ch = rows[r][i];
+                var b = Btn(root, "Key_" + ch, S(ArtGen + "Fx_RoundRect.png"), C, x0 + i * 128, 410 + r * 130, 118, 115, ch.ToString(), null, 54);
+                b.GetComponent<Image>().color = new Color(1f, 0.96f, 0.88f);
+                b.GetComponentInChildren<TextMeshProUGUI>().color = new Color(0.3f, 0.18f, 0.1f);
+                UnityEventTools.AddIntPersistentListener(b.onClick, boss.TypeLetter, ch - 'A');
+            }
+        }
+        var del = Btn(root, "Key_Delete", S(ArtGen + "Fx_RoundRect.png"), C, 960 - (9 * 128 - 10) * 0.5f + 59 + 7 * 128 + 64, 670, 246, 115, "ลบ", boss.Backspace, 46);
+        del.GetComponent<Image>().color = new Color(1f, 0.6f, 0.45f);
+        return root.gameObject;
     }
 
     static void SetBuildScenes()

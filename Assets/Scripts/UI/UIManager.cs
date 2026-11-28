@@ -126,7 +126,7 @@ public class UIManager : MonoBehaviour
         SetAt(bonusTexts, i, "x" + GameSession.Stage);                  // โบนัสเลเวล = ตัวคูณคะแนนตามด่าน
         SetAt(coinTexts, i, GameSession.Coins.ToString());
         SetAt(wordTexts, i, GameSession.AnimalsSolved + " คำ");
-        SetAt(scoreTexts, i, "คะแนน " + GameSession.Score.ToString("N0") + "   สถิติ " + SaveData.BestScore.ToString("N0"));
+        SetAt(scoreTexts, i, "คะแนน " + GameSession.Score.ToString("N0") + "  |  สถิติ " + SaveData.BestScore.ToString("N0"));
     }
 
     static void SetAt(TMP_Text[] arr, int i, string value)

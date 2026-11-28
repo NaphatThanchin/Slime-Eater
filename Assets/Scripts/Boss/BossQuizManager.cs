@@ -164,6 +164,8 @@ public class BossQuizManager : MonoBehaviour
         if (counterText) counterText.text = filled + " / " + slots.Count;
     }
 
+    public void TypeLetter(int i) => OnTextInput((char)('A' + i)); // ปุ่ม A-Z บนจอ (มือถือ)
+
     void OnTextInput(char c) // รับ A-Z เติมช่องซ้ายไปขวา
     {
         var gm = GameManager.Instance;
@@ -180,7 +182,7 @@ public class BossQuizManager : MonoBehaviour
         }
     }
 
-    void Backspace() // ลบตัวท้าย (ข้ามตัวใบ้)
+    public void Backspace() // ลบตัวท้าย (ข้ามตัวใบ้) ใช้ทั้งปุ่มคีย์บอร์ดและปุ่มบนจอ
     {
         if (busy || finished || typed == null) return;
         for (int i = typed.Length - 1; i >= 0; i--)
@@ -262,6 +264,7 @@ public class BossQuizManager : MonoBehaviour
         if (slime) slime.Happy();
         if (hintBubble) hintBubble.SetActive(false);
         ShowAnimal(current, true);
+        AudioManager.Play(AudioManager.Sfx.Eat);                    // ตอบถูก = เสียงกิน
         Debug.Log("[Boss] ถูกต้อง! (" + GameSession.AnimalsSolved + "/" + animals.Count + ")");
         yield return PopScale(animalImage ? animalImage.rectTransform : null, revealDuration);
         if (gm.State == GameState.BossPhase) { if (solvedHere >= Quota) Finish(true); else NextAnimal(); }

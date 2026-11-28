@@ -13,7 +13,9 @@ public class TutorialGuide : MonoBehaviour
     public GameObject hintBox;
     public TMP_Text hint;
     public float slow = 0.5f;              // ความเร็วเกมระหว่างสอน
-    static readonly string[] Texts = { "กด Space หรือ W เพื่อกระโดดข้ามหิน", "กด S หรือปุ่มลูกศรลง เพื่อสไลด์ลอดท่อนไม้", "กด A หรือปุ่มลูกศรซ้าย เพื่อหลบไปเลนซ้าย", "เก็บหัวใจเพื่อเพิ่มเลือด" };
+    static readonly string[] Keys = { "กด Space หรือ W เพื่อกระโดดข้ามหิน", "กด S หรือปุ่มลูกศรลง เพื่อสไลด์ลอดท่อนไม้", "กด A หรือปุ่มลูกศรซ้าย เพื่อหลบไปเลนซ้าย", "เก็บหัวใจเพื่อเพิ่มเลือด" };
+    static readonly string[] Swipes = { "ปัดขึ้น เพื่อกระโดดข้ามหิน", "ปัดลง เพื่อสไลด์ลอดท่อนไม้", "ปัดซ้าย เพื่อหลบไปเลนซ้าย", "เก็บหัวใจเพื่อเพิ่มเลือด" };
+    static string[] Texts => SwipeInput.IsTouch ? Swipes : Keys;     // มือถือสอนแบบปัดจอ คอมสอนแบบกดปุ่ม
     static readonly float[] FreezeAt = { 0.3f, 0.3f, 0.45f }; // หยุดภาพเมื่ออุปสรรคอีกกี่วินาทีถึงตัว
     bool on, frozen;
     int step = -1;
@@ -45,10 +47,10 @@ public class TutorialGuide : MonoBehaviour
     bool Pressed() // กดปุ่มถูกแล้วทำท่านั้นให้เลย
     {
         var kb = Keyboard.current;
-        if (kb == null) return false;
-        if (step == 0 && (kb.spaceKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame || kb.upArrowKey.wasPressedThisFrame)) player.Jump();
-        else if (step == 1 && (kb.sKey.wasPressedThisFrame || kb.downArrowKey.wasPressedThisFrame)) player.Slide();
-        else if (step == 2 && (kb.aKey.wasPressedThisFrame || kb.leftArrowKey.wasPressedThisFrame)) player.ChangeLane(-1);
+        bool k(Key a, Key b) => kb != null && (kb[a].wasPressedThisFrame || kb[b].wasPressedThisFrame);
+        if (step == 0 && (k(Key.Space, Key.W) || k(Key.UpArrow, Key.UpArrow) || SwipeInput.Up)) player.Jump();
+        else if (step == 1 && (k(Key.S, Key.DownArrow) || SwipeInput.Down)) player.Slide();
+        else if (step == 2 && (k(Key.A, Key.LeftArrow) || SwipeInput.Left)) player.ChangeLane(-1);
         else return false;
         return true;
     }

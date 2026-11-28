@@ -13,9 +13,12 @@ public class MenuManager : MonoBehaviour
     public TMP_Text nameWarning;
     public GameObject resetPanel;    // ยืนยันลบข้อมูล
 
+    public GameObject exitButton;    // บนเว็บปิดเกมเองไม่ได้ -> ซ่อน
+
     void Start()
     {
         Time.timeScale = 1f;
+        if (exitButton && Application.platform == RuntimePlatform.WebGLPlayer) exitButton.SetActive(false);
         settingPanel.SetActive(false);
         namePanel.SetActive(false);
         resetPanel.SetActive(false);
