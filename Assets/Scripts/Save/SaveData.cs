@@ -35,6 +35,7 @@ public class SaveData : MonoBehaviour
     public enum Upgrade { Magnet, Shield, Hp }
     static Data data;
     static string FilePath => Path.Combine(Application.persistentDataPath, "save.json");
+    const string PrefsKey = "SaveJson";
     public static Data D { get { if (data == null) Load(); return data; } }
 
     // ค่าที่ใช้บ่อย
@@ -68,22 +69,27 @@ public class SaveData : MonoBehaviour
         return newBest;
     }
 
-    public static void Save() // เขียนไฟล์
+    public static void Save() // เขียนไฟล์ + สำรองใน PlayerPrefs (บนเว็บ itch.io เบราว์เซอร์เก็บ PlayerPrefs ถาวรแน่นอน)
     {
         D.savedAt = System.DateTime.Now.ToString("dd/MM/yyyy HH:mm");
-        File.WriteAllText(FilePath, JsonUtility.ToJson(D, true));
+        string json = JsonUtility.ToJson(D, true);
+        try { File.WriteAllText(FilePath, json); } catch (System.Exception e) { Debug.LogWarning("[Save] เขียนไฟล์ไม่ได้ ใช้ PlayerPrefs แทน: " + e.Message); }
+        PlayerPrefs.SetString(PrefsKey, json);
+        PlayerPrefs.Save();
     }
 
     public static void ResetAll() // ลบข้อมูลทั้งหมด เริ่มเล่นใหม่
     {
         if (File.Exists(FilePath)) File.Delete(FilePath);
+        PlayerPrefs.DeleteKey(PrefsKey);
         data = new Data { missionVersion = 2 };
         Save();
     }
 
     static void Load() // อ่านไฟล์ ถ้ายังไม่มีให้ย้ายข้อมูลจากระบบเก่า (PlayerPrefs)
     {
-        data = File.Exists(FilePath) ? JsonUtility.FromJson<Data>(File.ReadAllText(FilePath)) : FromPlayerPrefs();
+        string json = File.Exists(FilePath) ? File.ReadAllText(FilePath) : PlayerPrefs.GetString(PrefsKey, "");   // ไฟล์หาย (เว็บ) -> ใช้สำรองใน PlayerPrefs
+        data = json != "" ? JsonUtility.FromJson<Data>(json) : FromPlayerPrefs();
         System.Array.Resize(ref data.owned, CharacterData.Count);   // กันไฟล์เก่าที่ขนาดไม่ตรง
         System.Array.Resize(ref data.upgrades, 3);
         System.Array.Resize(ref data.stats, MissionSystem.KindCount);
