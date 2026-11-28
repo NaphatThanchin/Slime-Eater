@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes">
+    <title>{{{ PRODUCT_NAME }}}</title>
+    <!-- ภาพเกมล็อก 1920x1080 (แนวนอน) / 1080x1920 (มือถือแนวตั้ง) ย่อขยายให้พอดีกรอบ ไม่ตัดขอบ -->
+    <style>
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+      #unity-canvas { position: fixed; display: block; background: #231F20; touch-action: none; }
+      #loading { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 60%; max-width: 320px; text-align: center; color: #fff; font-family: sans-serif; }
+      #bar { height: 12px; margin-top: 10px; border-radius: 6px; background: #444; overflow: hidden; }
+      #fill { width: 0%; height: 100%; background: #7bd34f; }
+      #bye { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #1d3b2a; color: #fff; font-family: sans-serif; text-align: center; padding: 16px; }
+      #bye button { font-size: 22px; padding: 12px 28px; border: 0; border-radius: 12px; background: #7bd34f; color: #173; cursor: pointer; }
+      #fs { position: fixed; right: 8px; bottom: 8px; width: 40px; height: 40px; border: 0; border-radius: 8px; background: rgba(0,0,0,.45); color: #fff; font-size: 22px; cursor: pointer; display: none; }
+    </style>
+  </head>
+  <body>
+    <canvas id="unity-canvas" tabindex="-1"></canvas>
+    <div id="loading">กำลังโหลด Slime Eater...<div id="bar"><div id="fill"></div></div></div>
+    <button id="fs" title="เต็มจอ">⛶</button>
+    <div id="bye"><div style="font-size:30px">ออกจากเกมแล้ว</div><div>ขอบคุณที่เล่น Slime Eater (บันทึกเกมไว้แล้ว)</div><button onclick="location.reload()">เล่นอีกครั้ง</button></div>
+    <script>
+      var canvas = document.querySelector("#unity-canvas");
+      var mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      function fit() { // ขนาดภาพคงที่ แล้วย่อขยายพอดีหน้าต่าง (ขอบดำถ้าสัดส่วนไม่ตรง)
+        var vw = window.innerWidth, vh = window.innerHeight, portrait = vh > vw;
+        var w = portrait ? 1080 : 1920, h = portrait ? 1920 : 1080;
+        if (canvas.width != w) canvas.width = w;
+        if (canvas.height != h) canvas.height = h;
+        var s = Math.min(vw / w, vh / h);
+        canvas.style.width = (w * s) + "px"; canvas.style.height = (h * s) + "px";
+        canvas.style.left = ((vw - w * s) / 2) + "px"; canvas.style.top = ((vh - h * s) / 2) + "px";
+      }
+      fit();
+      window.addEventListener("resize", fit);
+      window.addEventListener("orientationchange", function () { setTimeout(fit, 200); });
+
+      var buildUrl = "Build";
+      var config = {
+        arguments: [],
+        dataUrl: buildUrl + "/{{{ DATA_FILENAME }}}",
+        frameworkUrl: buildUrl + "/{{{ FRAMEWORK_FILENAME }}}",
+#if USE_WASM
+        codeUrl: buildUrl + "/{{{ CODE_FILENAME }}}",
+#endif
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
+        productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
+        productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
+        matchWebGLToCanvasSize: false,   // ใช้ขนาดภาพที่ล็อกไว้ ไม่ใช่ความละเอียดจอ (มือถือไม่หน่วง)
+        showBanner: function (msg, type) { if (type == 'error') alert(msg); },
+      };
+      var script = document.createElement("script");
+      script.src = buildUrl + "/{{{ LOADER_FILENAME }}}";
+      script.onload = function () {
+        createUnityInstance(canvas, config, function (p) { document.querySelector("#fill").style.width = 100 * p + "%"; })
+          .then(function (instance) {
+            document.querySelector("#loading").style.display = "none";
+            window.slimeExit = function () { // ปุ่ม EXIT ในเกม: ออกจากเต็มจอ ปิดเกม (หยุดเสียง) แล้วโชว์หน้าออกจากเกม
+              if (document.fullscreenElement) document.exitFullscreen();
+              var kb = window.slimeKb; if (kb) { kb.on = false; kb.input.blur(); }
+              var done = function () { canvas.style.display = "none"; document.querySelector("#fs").style.display = "none"; document.querySelector("#bye").style.display = "flex"; };
+              instance.Quit().then(done, done);
+            };
+            fit(); canvas.focus();
+            var fs = document.querySelector("#fs");
+            if (!mobile && document.fullscreenEnabled) fs.style.display = "block";   // ปุ่มเต็มจอบนคอม
+            fs.onclick = function () { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); };
+          })
+          .catch(function (message) { alert(message); });
+      };
+      document.body.appendChild(script);
+      canvas.addEventListener("pointerdown", function () { window.focus(); canvas.focus(); }); // กดแล้วรับคีย์บอร์ดได้ใน iframe ของ itch.io
+    </script>
+  </body>
+</html>

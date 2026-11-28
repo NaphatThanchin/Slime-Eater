@@ -12,7 +12,7 @@ EditorBuildSettings:
     path: Assets/Scenes/RunnerScene.unity
     guid: a4ca2408b4ac54c44bad65acb9cea5c6
   - enabled: 1
-    path: Assets/Scenes/BossScene.unity
+    path: Assets/Scenes/BonusTimeScene.unity
     guid: 97c5f1526fb6d304a827c643a2995665
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}

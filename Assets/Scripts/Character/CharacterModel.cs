@@ -1,6 +1,6 @@
-using UnityEngine;
+﻿using UnityEngine;
 
-// โชว์โมเดลตัวละครที่เลือก (เมนู / ฉากวิ่ง / ฉากบอส / หน้าดูตัวละครในร้าน)
+// โชว์โมเดลตัวละครที่เลือก (เมนู / ฉากวิ่ง / ฉาก Bonus time / หน้าดูตัวละครในร้าน)
 public class CharacterModel : MonoBehaviour
 {
     public GameObject[] prefabs;      // Char_SlimeGreen, Char_SlimeKing, ... เรียงตาม CharacterData

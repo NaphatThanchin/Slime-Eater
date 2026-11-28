@@ -1,28 +1,28 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
-// ภารกิจ 3 ชั้น: หลัก 9 หน้า (ง่าย -> ยาก) / ประจำวัน 3 อย่าง / ต่อเนื่องไม่รู้จบ (ปลดหลังจบหน้า 9)
+// ภารกิจ 3 ชั้น: หลัก 9 หน้า (ง่าย ไป ยาก) / ประจำวัน 3 อย่าง / ต่อเนื่องไม่รู้จบ (ปลดหลังจบหน้า 9)
 public class MissionSystem : MonoBehaviour
 {
-    public enum Kind { Coins, Jumps, Slides, Distance, Animals, PowerUps, Stage, EatBots, EatInRun, League, CleanCatch, Leaves }
+    public enum Kind { Coins, Jumps, Slides, Distance, Animals, PowerUps, Stage, EatBots, EatInRun, League, CleanCatch, Leaves, Hearts, Bonus } // League เลิกใช้ (เก็บช่องไว้ให้เซฟเก่า)
     public struct Row { public string title; public int progress, target, reward; public bool done; }
-    public const int KindCount = 12, Pages = 9, PerPage = 3, Count = Pages * PerPage;
+    public const int KindCount = 14, Pages = 9, PerPage = 3, Count = Pages * PerPage;
     public static System.Action<string> OnCompleted; // แจ้ง UI ตอนทำสำเร็จ
     static SaveData.Data D => SaveData.D;
     static readonly string[] Titles = { "เก็บเหรียญ {0} เหรียญ", "กระโดด {0} ครั้ง", "สไลด์ {0} ครั้ง", "วิ่งรวม {0} เมตร", "ทายสัตว์ถูก {0} ตัว", "เก็บไอเทมพลังพิเศษ {0} ชิ้น", "ไปให้ถึงด่าน {0}",
-                                        "กินสไลม์บอท {0} ตัว", "กินบอท {0} ตัวในรอบเดียว", "", "ไล่ทันบอทโดยไม่โดนชน {0} ครั้ง", "ใช้ใบไม้วิเศษ {0} ใบ" };
+                                        "กินสไลม์บอท {0} ตัว", "กินบอท {0} ตัวในรอบเดียว", "", "ไล่ทันบอทโดยไม่โดนชน {0} ครั้ง", "ใช้ใบไม้วิเศษ {0} ใบ", "เก็บหัวใจใหญ่ {0} ลูก", "ผ่าน Bonus time {0} ครั้ง" };
     static readonly int[] PageReward = { 100, 200, 400, 700, 1200, 2000, 2000, 2500, 3500 };
     static readonly (Kind kind, int target)[] Main =
     {
-        (Kind.Coins, 50),       (Kind.Jumps, 15),      (Kind.Distance, 500),    // หน้า 1 พื้นฐาน
-        (Kind.EatBots, 1),      (Kind.Slides, 15),     (Kind.Animals, 5),       // หน้า 2 เจอคู่แข่ง
-        (Kind.Coins, 300),      (Kind.Stage, 2),       (Kind.EatBots, 3),       // หน้า 3 เริ่มล่า
-        (Kind.Distance, 3000),  (Kind.Animals, 20),    (Kind.EatInRun, 2),      // หน้า 4 นักล่ามือใหม่
-        (Kind.League, 1),       (Kind.PowerUps, 20),   (Kind.CleanCatch, 1),    // หน้า 5 เลื่อนลีก
-        (Kind.EatBots, 15),     (Kind.Stage, 4),       (Kind.Animals, 50),      // หน้า 6 ผู้ล่าตัวจริง
-        (Kind.League, 2),       (Kind.EatInRun, 3),    (Kind.Coins, 3000),      // หน้า 7 ป่าใบแดง
-        (Kind.Distance, 25000), (Kind.EatBots, 30),    (Kind.Animals, 100),     // หน้า 8 จ้าวแห่งป่า
-        (Kind.League, 3),       (Kind.Stage, 8),       (Kind.EatBots, 50),      // หน้า 9 ราชันย์
+        (Kind.Coins, 100),      (Kind.Jumps, 20),      (Kind.Distance, 1000),   // หน้า 1 พื้นฐาน
+        (Kind.EatBots, 1),      (Kind.Slides, 20),     (Kind.Bonus, 1),         // หน้า 2 เจอคู่แข่ง + Bonus แรก
+        (Kind.Coins, 1000),     (Kind.Stage, 2),       (Kind.Animals, 10),      // หน้า 3 ไปไกลขึ้น
+        (Kind.Distance, 10000), (Kind.EatBots, 5),     (Kind.Hearts, 9),        // หน้า 4 (หัวใจ 9 = ปลดซื้อ Angel)
+        (Kind.PowerUps, 20),    (Kind.CleanCatch, 1),  (Kind.Stage, 4),         // หน้า 5 นักล่ามือใหม่
+        (Kind.EatInRun, 3),     (Kind.Bonus, 10),      (Kind.Animals, 50),      // หน้า 6
+        (Kind.EatBots, 20),     (Kind.Coins, 10000),   (Kind.Leaves, 10),       // หน้า 7
+        (Kind.Distance, 50000), (Kind.EatBots, 40),    (Kind.Animals, 100),     // หน้า 8 (กิน 40 = ปลดซื้อ Demon)
+        (Kind.Stage, 8),        (Kind.EatInRun, 5),    (Kind.EatBots, 66),      // หน้า 9 ราชันย์
     };
     static readonly (Kind kind, int target, int reward)[] Daily =
     {
@@ -32,8 +32,8 @@ public class MissionSystem : MonoBehaviour
     static readonly (Kind kind, int target)[] Endless = { (Kind.EatBots, 10), (Kind.Distance, 10000), (Kind.Animals, 30) }; // เป้าแรก x1.5 ทุกครั้ง
 
     static int Stat(Kind k) => D.stats[(int)k];
-    static bool IsMax(Kind k) => k == Kind.Stage || k == Kind.EatInRun || k == Kind.League; // นับค่าสูงสุด ไม่ใช่สะสม
-    static string Title(Kind k, int target) => k == Kind.League ? "เลื่อนขึ้นลีก " + LeagueData.Name(target) : string.Format(Titles[(int)k], target.ToString("N0"));
+    static bool IsMax(Kind k) => k == Kind.Stage || k == Kind.EatInRun; // นับค่าสูงสุด ไม่ใช่สะสม
+    static string Title(Kind k, int target) => string.Format(Titles[(int)k], target.ToString("N0"));
     public static bool Done(int i) => D.missionDone[i];
     public static bool AllMainDone { get { for (int p = 0; p < Pages; p++) if (!PageDone(p)) return false; return true; } }
     static int MainProgress(int i) => Mathf.Min(Stat(Main[i].kind), Main[i].target);
@@ -79,11 +79,23 @@ public class MissionSystem : MonoBehaviour
     static int EndlessTarget(int e) => Mathf.RoundToInt(Endless[e].target * Mathf.Pow(1.5f, D.endlessLevel[e]));
     static int EndlessReward(int e) => 1500 + 500 * D.endlessLevel[e];
 
-    static void Reward(string title, int coins)
+    static void Reward(string title, int coins) // ครบเป้า = เข้าคิวรอกดรับที่เมนู (ยังไม่ให้เหรียญ)
     {
-        SaveData.Bank += coins;
+        D.pendingTitles.Add(title); D.pendingCoins.Add(coins);
         SaveData.Save();
-        OnCompleted?.Invoke(title + " +" + coins.ToString("N0"));
+        OnCompleted?.Invoke(title);
+    }
+
+    public static int PendingCount => D.pendingCoins.Count;
+    public static int PendingTotal { get { int t = 0; foreach (int c in D.pendingCoins) t += c; return t; } }
+
+    public static int ClaimAll() // กดรับรางวัลทั้งหมดที่รอ
+    {
+        int t = PendingTotal;
+        SaveData.Bank += t;
+        D.pendingTitles.Clear(); D.pendingCoins.Clear();
+        SaveData.Save();
+        return t;
     }
 
     static void EnsureDaily() // วันใหม่ -> สุ่มภารกิจประจำวัน 3 อย่างไม่ซ้ำกัน
@@ -131,8 +143,7 @@ public class MissionSystem : MonoBehaviour
 
     public static void Migrate() // เปลี่ยนตารางภารกิจ: ภารกิจที่เคยทำถึงแล้วนับว่าเสร็จ (ไม่ให้รางวัลซ้ำ)
     {
-        D.stats[(int)Kind.League] = D.league;
         for (int i = 0; i < Count; i++) D.missionDone[i] = MainProgress(i) >= Main[i].target;
-        D.missionVersion = 2;
+        D.missionVersion = 3;
     }
 }

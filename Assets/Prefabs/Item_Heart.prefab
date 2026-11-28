@@ -72,6 +72,8 @@ MonoBehaviour:
   value: 40
   spinSpeed: 180
   bobHeight: 0.15
+  botOnly: 0
+  owner: {fileID: 0}
 --- !u!1 &4248361654540489234
 GameObject:
   m_ObjectHideFlags: 0

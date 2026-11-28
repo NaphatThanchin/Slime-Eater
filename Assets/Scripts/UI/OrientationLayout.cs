@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 
 // จัดหน้าจอตามแนวจอ: แนวนอน = แบบคอมเดิม, แนวตั้ง (มือถือ) = UI ใหญ่ขึ้น + ย้ายบางชิ้นไม่ให้ทับกัน
@@ -16,9 +16,11 @@ public class OrientationLayout : MonoBehaviour
     public Move[] moves = new Move[0];
     public GameObject[] touchOnly = new GameObject[0];   // โชว์เฉพาะมือถือ (แป้นพิมพ์บนจอ)
     public GameObject[] desktopOnly = new GameObject[0]; // โชว์เฉพาะคอม (ข้อความบอกปุ่มคีย์บอร์ด)
+    public GameObject[] landscapeOnly = new GameObject[0]; // ซ่อนตอนแนวตั้ง (เสา/เชือกป้ายไม้หน้าเมนู)
     public GameObject rotatePrompt;          // มือถือถือแนวนอน -> บอกให้หมุนจอ
-    public Transform slime3D;                // สไลม์ 3D หน้ากล้อง (ฉากบอส)
-    public Vector2 slimeUnits = new Vector2(230f, 760f); // ตำแหน่งสไลม์ตอนแนวตั้ง (หน่วย UI จากมุมซ้ายล่าง เหนือช่องคำตอบ)
+    public Transform slime3D;                // สไลม์ 3D หน้ากล้อง (ฉาก Bonus time)
+    public RectTransform slimeOn;            // แนวตั้ง: สไลม์ยืนบนกล่องนี้ (ช่องคำตอบ)
+    public float slimeX = 190f;              // ระยะสไลม์จากขอบซ้าย (หน่วย UI)
     public float portraitWidth = 1300f;      // แนวตั้งอ้างอิงกว้าง 1300 แทน 1920 -> UI/ตัวหนังสือใหญ่ขึ้น ~1.5 เท่า
     public Camera fixedCamera;               // กล้องที่อยู่นิ่ง (หน้าเมนู) ถอยกล้องตอนแนวตั้ง
     public Vector3 portraitCamPos;
@@ -32,6 +34,8 @@ public class OrientationLayout : MonoBehaviour
     int state = -1;                          // 0 = แนวนอน, 1 = แนวตั้ง
 
     public static bool Portrait => Screen.height > Screen.width;
+    static bool rotateDismissed;                                    // แตะปิดคำเตือนหมุนจอแล้ว (ทั้งเกม)
+    public void DismissRotate() => rotateDismissed = true;
 
     void Awake()
     {
@@ -48,11 +52,12 @@ public class OrientationLayout : MonoBehaviour
     void Update() // เช็กทุกเฟรม ผู้เล่นหมุนจอได้ตลอด
     {
         int s = Portrait ? 1 : 0;
-        if (rotatePrompt) rotatePrompt.SetActive(SwipeInput.IsTouch && Screen.width > Screen.height * 1.2f);
+        if (rotatePrompt) rotatePrompt.SetActive(!rotateDismissed && SwipeInput.IsTouch && Screen.width > Screen.height * 1.2f);
         if (s == state) return;
         state = s;
         scaler.referenceResolution = new Vector2(s == 1 ? portraitWidth : 1920f, 1080f);
         scaler.matchWidthOrHeight = s == 1 ? 0f : 0.5f;           // แนวตั้งยึดความกว้าง UI ไม่ล้นข้างจอ
+        foreach (var g in landscapeOnly) g.SetActive(s == 0);
         for (int i = 0; i < moves.Length; i++)
         {
             var m = moves[i];
@@ -63,11 +68,12 @@ public class OrientationLayout : MonoBehaviour
             m.target.localScale = p && m.scale > 0f ? Vector3.one * m.scale : landScale[i];
         }
         if (fixedCamera) { fixedCamera.transform.position = s == 1 ? portraitCamPos : camLand; fixedCamera.fieldOfView = s == 1 ? portraitFov : fovLand; } // จอแคบ = ถอยกล้อง สไลม์ไม่ล้นจอ
-        if (!slime3D) return;
+        if (!slime3D || !slimeOn) return;
         var cam = Camera.main;
         float canvasH = portraitWidth * Screen.height / Screen.width;                         // ความสูงจอในหน่วย UI
-        var vp = new Vector3(slimeUnits.x / portraitWidth, slimeUnits.y / canvasH, slimeLand.z);
+        float top = slimeOn.anchorMin.y * canvasH + slimeOn.anchoredPosition.y + slimeOn.rect.height * 0.5f * slimeOn.localScale.y; // ขอบบนช่องคำตอบ
+        var vp = new Vector3(slimeX / portraitWidth, (top + 20f) / canvasH, slimeLand.z);    // สไลม์ยืนเหนือช่องคำตอบพอดีทุกขนาดจอ
         slime3D.localPosition = s == 1 ? cam.transform.InverseTransformPoint(cam.ViewportToWorldPoint(vp)) : slimeLand;
-        slime3D.localScale = s == 1 ? slimeScale * Mathf.Clamp(cam.aspect * 0.65f, 0.3f, 1f) : slimeScale; // จอแคบ = สไลม์เล็กลง ไม่บังคำตอบ/แป้นพิมพ์
+        slime3D.localScale = s == 1 ? slimeScale * Mathf.Clamp(cam.aspect * 0.65f, 0.3f, 1f) : slimeScale; // จอแคบ = สไลม์เล็กลง ไม่บังคำตอบ
     }
 }

@@ -1,18 +1,19 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-// เสียงทั้งเกม: เพลงพื้นหลัง (ฉากบอสสลับเป็นเพลงคำถาม) + เสียงประกอบ + เสียงกดปุ่ม UI ทุกปุ่ม
+// เสียงทั้งเกม: เพลงพื้นหลัง (ฉาก Bonus time สลับเป็นเพลงคำถาม) + เสียงประกอบ + เสียงกดปุ่ม UI ทุกปุ่ม
 public class AudioManager : MonoBehaviour
 {
     public enum Sfx { Jump, Coin, Click, Eat }
     static AudioManager instance;
-    public AudioClip musicClip, bossMusic;      // เพลงปกติ / เพลงตอนทายคำถาม
+    public AudioClip musicClip, bonusMusic;      // เพลงปกติ / เพลงตอนทายคำถาม
     public AudioClip[] sfxClips;                // เรียงตาม Sfx
     public float[] sfxGain = { 0.35f, 0.5f, 0.9f, 1f }; // ปรับให้ดังพอ ๆ กัน (Jump ดังมาก ลดลง / Eat เบา ใช้เต็ม)
-    public float musicGain = 0.5f, bossGain = 1f;        // เพลงหลักดังกว่าเพลงคำถาม ~2 เท่า จึงลดครึ่ง
+    public float musicGain = 0.5f, bonusGain = 1f;        // เพลงหลักดังกว่าเพลงคำถาม ~2 เท่า จึงลดครึ่ง
     public Slider volumeSlider, sfxSlider;      // Slider ของฉากนี้
+    public const float MusicMax = 0.13f, SfxMax = 0.18f; // ดังสุดของแถบ: แถบกลาง (0.5) = ระดับที่ทดสอบแล้วว่าพอดี เลื่อนเบาลง/ดังขึ้นได้อีกเท่าตัว
     AudioSource music, sfx, jump;               // jump แยกช่อง: กระโดดใหม่ตัดเสียงเก่า ไม่ซ้อนกัน
     float gain = 1f, fade = 1f, duck = 1f, lastCoin;
 
@@ -36,9 +37,9 @@ public class AudioManager : MonoBehaviour
     void OnScene(Scene s, LoadSceneMode m) // ทุกฉาก: ผูกเสียงปุ่ม + เลือกเพลง
     {
         foreach (var b in FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None)) { b.onClick.RemoveListener(Click); b.onClick.AddListener(Click); }
-        bool boss = s.name == "BossScene";
-        var clip = boss ? bossMusic : musicClip;
-        if (clip && music.clip != clip) { StopAllCoroutines(); StartCoroutine(SwapMusic(clip, boss ? bossGain : musicGain)); }
+        bool quiz = s.name == "BonusTimeScene";
+        var clip = quiz ? bonusMusic : musicClip;
+        if (clip && music.clip != clip) { StopAllCoroutines(); StartCoroutine(SwapMusic(clip, quiz ? bonusGain : musicGain)); }
     }
 
     IEnumerator SwapMusic(AudioClip clip, float g) // ค่อยๆ เบาลง -> เปลี่ยนเพลง -> ค่อยๆ ดังขึ้น (ไม่ตัดกระตุก)
@@ -54,7 +55,7 @@ public class AudioManager : MonoBehaviour
     void Update() // ความดังเพลง = slider x ความดังของไฟล์ x เฟด x ลดเสียงตอนเล่นเสียงกิน
     {
         duck = Mathf.MoveTowards(duck, sfx.isPlaying && sfx.clip == Clip(Sfx.Eat) ? 0.45f : 1f, Time.unscaledDeltaTime * 3f);
-        music.volume = SaveData.D.musicVolume * gain * fade * duck;
+        music.volume = SaveData.D.musicVolume * MusicMax * gain * fade * duck;
     }
 
     AudioClip Clip(Sfx s) => sfxClips != null && (int)s < sfxClips.Length ? sfxClips[(int)s] : null;
@@ -64,7 +65,7 @@ public class AudioManager : MonoBehaviour
         var a = instance;
         var clip = a ? a.Clip(s) : null;
         if (!clip) return;
-        float v = SaveData.D.sfxVolume * a.sfxGain[(int)s];
+        float v = SaveData.D.sfxVolume * SfxMax * a.sfxGain[(int)s];
         if (s == Sfx.Jump) { a.jump.Stop(); a.jump.clip = clip; a.jump.volume = v; a.jump.Play(); return; }
         if (s == Sfx.Coin) { if (Time.unscaledTime - a.lastCoin < 0.06f) return; a.lastCoin = Time.unscaledTime; } // เก็บหลายเหรียญติดกันไม่ให้เสียงซ้อนจนแตก
         if (s == Sfx.Eat) { a.sfx.clip = clip; a.sfx.volume = v; a.sfx.Play(); return; }  // ใช้ช่องหลักเพื่อให้รู้ว่ากำลังเล่น (ลดเพลง)

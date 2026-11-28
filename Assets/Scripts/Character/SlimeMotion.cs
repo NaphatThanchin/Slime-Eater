@@ -1,6 +1,6 @@
-using UnityEngine;
+﻿using UnityEngine;
 
-// ท่าทางสไลม์ (ผู้เล่นและบอทใช้ร่วมกัน): ฟิสิกส์กระโดด/สไลด์ ยืดหดตอนวิ่ง เอียงตอนเปลี่ยนเลน หอบตอนหมดแรง ตัวโตหลังกิน
+// ท่าทางสไลม์ : ฟิสิกส์กระโดด/สไลด์ ยืดหดตอนวิ่ง เอียงตอนเปลี่ยนเลน หอบตอนหมดแรง ตัวโตหลังกิน
 public class SlimeMotion : MonoBehaviour
 {
     public RunnerConfig config;
@@ -8,7 +8,11 @@ public class SlimeMotion : MonoBehaviour
     public float laneX;                   // ตำแหน่งเลนเป้าหมาย ใช้คิดท่าเอียง
     public bool tired;                    // บอทหมดแรง = หยุดเด้ง หายใจหอบ
     public float growScale = 1.35f;       // ตัวโตสุดหลังกิน
+    public bool flying;                   // บินลอยค้าง (SlimeAngel)
+    public float flyHeight = 3f;
+    public float jumpBoost = 1f;          // สปริงเห็ด = กระโดดสูงขึ้น
     public bool Grounded { get; private set; } = true;
+    public float Ground => Platform.HeightAt(transform.position); // พื้นใต้ตัว (บนขอนยาว/ทางลาด)
     public bool Sliding => slideTimer > 0f && Grounded;
     float velocityY, slideTimer, landSquash, growTimer;
     Vector3 baseScale;
@@ -18,7 +22,7 @@ public class SlimeMotion : MonoBehaviour
     public bool Jump() // คืนค่า false ถ้ายังลอยอยู่
     {
         if (!Grounded) return false;
-        velocityY = config.jumpVelocity;
+        velocityY = config.jumpVelocity * jumpBoost;
         Grounded = false;
         slideTimer = 0f;
         return true;
@@ -38,12 +42,25 @@ public class SlimeMotion : MonoBehaviour
         var gm = GameManager.Instance;
         if (gm && gm.IsPaused) return;
         float dt = Time.deltaTime;
-        if (!Grounded)
+        if (flying) // ลอยขึ้นไปค้างที่ความสูงบิน หมดเวลาแล้วตกลงตามแรงโน้มถ่วง
+        {
+            var f = transform.position;
+            f.y = Mathf.MoveTowards(f.y, flyHeight, 8f * dt);
+            transform.position = f;
+            Grounded = false; velocityY = 0f; slideTimer = 0f;
+        }
+        else
         {
             var p = transform.position;
-            velocityY -= config.gravity * dt;
-            p.y += velocityY * dt;
-            if (p.y <= 0f) { p.y = 0f; Grounded = true; velocityY = 0f; landSquash = 1f; } // ไม่ต่ำกว่าพื้น = ไม่ตกแมพ
+            float g = Ground;
+            if (Grounded && p.y > g + 0.05f) Grounded = false;                         // วิ่งพ้นขอบขอน = ตกลง
+            if (Grounded) p.y = g;                                                     // วิ่งตามทางลาด/บนขอน
+            else
+            {
+                velocityY -= config.gravity * (jumpBoost > 1f ? 0.9f : 1f) * dt;      // สปริง = ลอยนานขึ้น
+                p.y += velocityY * dt;
+                if (p.y <= g && velocityY <= 0f) { p.y = g; Grounded = true; velocityY = 0f; landSquash = 1f; } // ลงพื้น/บนขอน
+            }
             transform.position = p;
         }
         if (Sliding) slideTimer -= dt;
@@ -51,10 +68,10 @@ public class SlimeMotion : MonoBehaviour
         Animate(dt);
     }
 
-    void Animate(float dt) // ยืดหด + เอียง (เลื่อนค่าแบบนุ่มๆ)
+    void Animate(float dt) // ยืดหด + เอียง 
     {
         Vector3 t;
-        if (tired) { float b = Mathf.Sin(Time.time * 5f) * 0.08f; t = new Vector3(1f + b, 1f - b, 1f + b); }          // หอบ
+        if (tired) { float b = Mathf.Sin(Time.time * 5f) * 0.08f; t = new Vector3(1f + b, 1f - b, 1f + b); }          // หมอบ
         else if (Sliding) t = new Vector3(1.35f, 0.45f, 1.25f);
         else if (!Grounded) t = velocityY > 0 ? new Vector3(0.85f, 1.25f, 0.85f) : new Vector3(1.05f, 0.95f, 1.05f);
         else { float w = Mathf.Sin(Time.time * 14f) * 0.06f; t = new Vector3(1f - w, 1f + w, 1f - w); }              // วิ่ง

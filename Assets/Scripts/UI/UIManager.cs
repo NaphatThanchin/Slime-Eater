@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -18,8 +18,16 @@ public class UIManager : MonoBehaviour
     public TMP_Text scoreValueText;      // คะแนนรวม (กลางบน)
     public TMP_Text stageText;           // ด่านที่
     public TMP_Text leafText;            // ใบไม้วิเศษที่มี
+    public TMP_Text coinTierText;        // ตัวคูณเหรียญ x1, x2 ...
+    public TMP_Text wordText;            // ตัวอักษรที่ต้องเก็บก่อน Bonus time (มุมขวาบน)
+    public TMP_Text abilityText;         // สถานะความสามารถตัวละคร
+    public GameObject continuePanel;     // ตายแล้วถามใช้ยาฟื้น
+    public TMP_Text continueText;
+    public GameObject bubbleButton;      // ปุ่มฟองสไลม์ (มีของ + ยังไม่ใช้รอบนี้)
+    public GameObject missionIcon;       // ไอคอนภารกิจที่ทำครบรอกดรับ + ตัวเลข (แทนข้อความกลางเกม)
+    public TMP_Text missionCount;
+    public TMP_Text bubbleCount;
     public Image[] powerUpFills;         // วงเวลาไอเทม แม่เหล็ก/เกราะ/x2
-    public TMP_Text toast;               // ข้อความเด้ง เช่น ภารกิจสำเร็จ
     public GameObject rivalRoot;         // แถบบอทคู่แข่ง (มีแค่ฉากวิ่ง)
     public TMP_Text rivalName, rivalGap;
     public Image rivalHp;
@@ -43,8 +51,9 @@ public class UIManager : MonoBehaviour
         if (banner) banner.gameObject.SetActive(false);
         if (hudRoot) hudRoot.SetActive(true);
         if (popupTemplate) popupTemplate.gameObject.SetActive(false);
-        if (toast) toast.gameObject.SetActive(false);
+        if (continuePanel) continuePanel.SetActive(false);
         SetHintLeaves(GameSession.HintLeaves);
+        SetWord();
         if (fader) StartCoroutine(FadeIn(0.5f));
     }
 
@@ -52,7 +61,20 @@ public class UIManager : MonoBehaviour
     {
         t = Mathf.Clamp01(t);
         if (progressFill) progressFill.fillAmount = t <= 0f ? 0f : Mathf.Lerp(progressFillRange.x, progressFillRange.y, t);
-        if (progressText) progressText.text = Mathf.FloorToInt(t * GameSession.TargetDistance) + " m";
+        if (progressText) progressText.text = Mathf.FloorToInt(GameSession.TotalDistance).ToString("N0") + " m";   // ระยะจริงที่วิ่งได้ (หลอด = ถึงฉากถัดไป)
+    }
+
+    public void SetCoinTier(int tier) { if (coinTierText) coinTierText.text = "เหรียญ x" + tier; }
+
+    public void SetWord() // B O _ _ : ตัวที่เก็บแล้วสีทอง ตัวที่ยังไม่ได้สีจาง
+    {
+        if (!wordText) return;
+        string w = GameSession.Word;
+        if (string.IsNullOrEmpty(w)) { wordText.text = ""; return; }
+        var sb = new System.Text.StringBuilder("<size=70%>Bonus time</size>\n");
+        for (int i = 0; i < w.Length; i++)
+            sb.Append(i < GameSession.Got.Length && GameSession.Got[i] ? "<color=#FFD54A>" + w[i] + "</color>" : "<color=#FFFFFF55>" + w[i] + "</color>").Append(i < w.Length - 1 ? " " : "");
+        wordText.text = sb.ToString();
     }
 
     float hpTarget = -1f;  // fillAmount เป้าหมาย (หลอดค่อยๆ เลื่อนไปหา)
@@ -64,9 +86,16 @@ public class UIManager : MonoBehaviour
         if (hpFill && !Application.isPlaying) hpFill.fillAmount = hpTarget;
     }
 
-    void Update() // หลอดเลือดค่อยๆ ลด/เพิ่มแบบนุ่มๆ
+    void Update() // หลอดเลือดค่อยๆ ลด/เพิ่มแบบนุ่มๆ + สถานะความสามารถ
     {
         if (hpFill && hpTarget >= 0f) hpFill.fillAmount = Mathf.MoveTowards(hpFill.fillAmount, hpTarget, Time.unscaledDeltaTime * 0.6f);
+        if (abilityText && CharacterAbility.Instance && Time.frameCount % 10 == 0) abilityText.text = CharacterAbility.Instance.Status;
+        if (bubbleButton && PowerUps.Instance && Time.frameCount % 10 == 0)
+        {
+            bool show = PowerUps.Instance.CanBubble;
+            if (bubbleButton.activeSelf != show) bubbleButton.SetActive(show);
+            if (bubbleCount) bubbleCount.text = "x" + SaveData.D.bubbles;
+        }
     }
 
     public void SetScore(int score, int coins)
@@ -107,26 +136,32 @@ public class UIManager : MonoBehaviour
         if (GameManager.Instance) GameManager.Instance.ResumeWithCountdown(); // นับ 3 2 1 ก่อนเล่นต่อ
     }
 
+    public void UseBubble() { if (PowerUps.Instance) PowerUps.Instance.UseBubble(); }
+    public void ShowContinue(int cost, int have) { if (!continuePanel) return; continueText.text = "ใช้ยาฟื้นสไลม์ " + cost + " ขวด เล่นต่อ?\n(มี " + have + " ขวด)"; continuePanel.SetActive(true); }
+    public void HideContinue() { if (continuePanel) continuePanel.SetActive(false); }
+    public void ContinueYes() { if (GameManager.Instance) GameManager.Instance.ContinueRun(); }
+    public void ContinueNo() { if (GameManager.Instance) GameManager.Instance.DeclineContinue(); }
+
     public void RestartGame() { if (GameManager.Instance) GameManager.Instance.RestartGame(); }
     public void BackToMenu() { if (GameManager.Instance) GameManager.Instance.GoToMainMenu(); }
 
-    public void ShowResult(bool win)
+    public void ShowResult(bool newBest)
     {
         if (settingsPanel) settingsPanel.SetActive(false);
-        FillResult(win);
+        FillResult(newBest);
         if (resultRoot) resultRoot.SetActive(true);
     }
 
-    void FillResult(bool win) // ใส่ค่าในหน้าสรุปผล (win = ทำสถิติใหม่ -> หน้า Victory)
+    void FillResult(bool newBest) // เลือดหมด = หน้าแพ้เสมอ (สถิติใหม่ขึ้นเป็นข้อความแทน ไม่ใช่หน้า Victory)
     {
-        if (victoryPanel) victoryPanel.SetActive(win);
-        if (defeatPanel) defeatPanel.SetActive(!win);
-        int i = win ? 0 : 1;
+        if (victoryPanel) victoryPanel.SetActive(false);
+        if (defeatPanel) defeatPanel.SetActive(true);
+        int i = 1;
         SetAt(distanceTexts, i, Mathf.FloorToInt(GameSession.TotalDistance) + " m.");
         SetAt(bonusTexts, i, "x" + GameSession.Stage);                  // โบนัสเลเวล = ตัวคูณคะแนนตามด่าน
         SetAt(coinTexts, i, GameSession.Coins.ToString());
         SetAt(wordTexts, i, GameSession.AnimalsSolved + " คำ");
-        SetAt(scoreTexts, i, "คะแนน " + GameSession.Score.ToString("N0") + "  |  สถิติ " + SaveData.BestScore.ToString("N0"));
+        SetAt(scoreTexts, i, (newBest ? "สถิติใหม่! " : "") + "คะแนน " + GameSession.Score.ToString("N0") + "  |  สถิติ " + SaveData.BestScore.ToString("N0"));
     }
 
     static void SetAt(TMP_Text[] arr, int i, string value)
@@ -149,25 +184,13 @@ public class UIManager : MonoBehaviour
         if (icon.activeSelf != t > 0f) icon.SetActive(t > 0f);
     }
 
-    readonly Queue<string> toasts = new Queue<string>();
-
-    public void ShowToast(string text) // ข้อความต่อคิว โชว์ทีละอัน
+    public void SetMissionBadge() // ภารกิจครบรอกดรับกี่อัน
     {
-        if (!toast) return;
-        toasts.Enqueue(text);
-        if (toasts.Count == 1) StartCoroutine(ToastRoutine());
-    }
-
-    IEnumerator ToastRoutine()
-    {
-        while (toasts.Count > 0)
-        {
-            toast.text = toasts.Peek();
-            toast.gameObject.SetActive(true);
-            yield return new WaitForSecondsRealtime(2.2f);
-            toasts.Dequeue();
-        }
-        toast.gameObject.SetActive(false);
+        if (!missionIcon) return;
+        int n = MissionSystem.PendingCount;
+        for (int c = 0; c < CharacterData.Count; c++) if (CharacterData.CanClaim(c)) n++;   // ความสามารถตัวละครที่รอกดรับ
+        missionIcon.SetActive(n > 0);
+        if (missionCount) missionCount.text = n.ToString();
     }
 
     public void ShowRival(bool show) { if (rivalRoot && rivalRoot.activeSelf != show) rivalRoot.SetActive(show); }
