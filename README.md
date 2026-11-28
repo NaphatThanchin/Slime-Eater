@@ -46,7 +46,6 @@
 | `Assets/Scripts/Character` | ข้อมูล/ความสามารถ/ท่าทางตัวละคร, ป้ายชื่อ |
 | `Assets/Scripts/Save` | บันทึกเกม, ภารกิจ |
 | `Assets/Scripts/UI` | HUD, ตัวหนังสือลอย, จัดจอแนวตั้ง, แก้สระไทย |
-| `Assets/Scripts/Dev` | AutoPilot ทดสอบอัตโนมัติ, DebugGuard (เฉพาะทดสอบ) |
 | `Assets/Art` | ภาพ UI/สัตว์, โมเดลตัวละคร (`Models`), พื้นผิวที่สร้างอัตโนมัติ (`Generated`) |
 | `Assets/ThirdParty` | Hyper Casual UI + Stylized Nature MegaKit, TextMesh Pro |
 | `Assets/Editor` | ตัวสร้างฉากอัตโนมัติ + เครื่องมือ Game View |
